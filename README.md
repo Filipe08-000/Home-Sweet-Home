@@ -1,7 +1,9 @@
 # Home-Sweet-Home
 Meu site no estilo airbnb para a matéria de projeto integrador.
-
+https://filipe08-000.github.io/Home-Sweet-Home/
 Para executar e abrir o site é necessário ter o xampp rondando na máquina em paralelo com o banco de dados já feito e em uso, siga o código para criação do banco via mysql pelo xampp.
+
+
 -- 1. Criação do Banco de Dados
 -- (Se o banco airbnb_db2 já existir, este comando será ignorado)
 CREATE DATABASE IF NOT EXISTS airbnb_db2 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
