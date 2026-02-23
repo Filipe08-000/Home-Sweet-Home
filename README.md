@@ -1,6 +1,6 @@
 # Home-Sweet-Home
 Meu site no estilo airbnb para a matéria de projeto integrador.
-https://filipe08-000.github.io/Home-Sweet-Home/
+
 Para executar e abrir o site é necessário ter o xampp rondando na máquina em paralelo, com o banco de dados já feito e em uso, siga o código para criação do banco via mysql pelo xampp.
 
 
