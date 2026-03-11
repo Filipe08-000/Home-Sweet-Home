@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Painel - Home Sweet Home</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
+    <div class="container">
+        <a class="navbar-brand text-danger fw-bold" href="index.html">Home Sweet Home</a>
+        <div>
+            <a href="cadastrar_imovel.html" class="btn btn-success me-2">Novo Anúncio</a>
+            <a href="index.html" class="btn btn-outline-dark">Voltar</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-5">
+    <h2 class="mb-4">Painel do Anfitrião</h2>
+    
+    <div class="card shadow border-0">
+        <div class="card-body">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Foto</th>
+                        <th>Título</th>
+                        <th>Cidade</th>
+                        <th>Diária</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-imoveis">
+                    <tr><td colspan="5" class="text-center">Buscando seus imóveis...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+    const supabaseUrl = 'https://drlnbbodugxkndtpomfa.supabase.co'
+    const supabaseKey = 'sb_publishable_uxQbUyjsM-DgKapQzvE32Q_ZUNBtdp1'
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    let usuarioLogadoId = null;
+
+    async function carregarPainel() {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+            window.location.href = 'login.html';
+            return;
+        }
+
+        // Pega o ID do usuário na tabela pública
+        const { data: usuarioDb } = await supabase.from('usuarios').select('id').eq('email', user.email).single();
+        usuarioLogadoId = usuarioDb.id;
+
+        // Busca SÓ os imóveis deste usuário
+        const { data: imoveis, error } = await supabase
+            .from('imoveis')
+            .select('*')
+            .eq('dono_id', usuarioLogadoId)
+            .order('id', { ascending: false });
+
+        const tbody = document.getElementById('tabela-imoveis');
+        tbody.innerHTML = ''; // Limpa o "Buscando..."
+
+        if (error || imoveis.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Você ainda não tem imóveis cadastrados.</td></tr>';
+            return;
+        }
+
+        imoveis.forEach(imovel => {
+            const imageUrl = imovel.imagem ? `${supabaseUrl}/storage/v1/object/public/imoveis-imagens/${imovel.imagem}` : 'https://via.placeholder.com/50';
+            const tr = document.createElement('tr');
+            
+            tr.innerHTML = `
+                <td><img src="${imageUrl}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 5px;"></td>
+                <td class="fw-bold">${imovel.titulo}</td>
+                <td>${imovel.cidade}</td>
+                <td>R$ ${parseFloat(imovel.preco_diaria).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger btn-excluir" data-id="${imovel.id}">Excluir</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // Adiciona a ação de deletar em todos os botões "Excluir"
+        document.querySelectorAll('.btn-excluir').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const idParaExcluir = e.target.getAttribute('data-id');
+                if (confirm('Tem certeza que deseja excluir este imóvel?')) {
+                    e.target.innerText = "Excluindo...";
+                    e.target.disabled = true;
+
+                    // Deleta do banco
+                    const { error } = await supabase.from('imoveis').delete().eq('id', idParaExcluir);
+                    
+                    if (!error) {
+                        e.target.closest('tr').remove(); // Some com a linha na hora!
+                    } else {
+                        alert('Erro ao excluir: ' + error.message);
+                        e.target.innerText = "Excluir";
+                        e.target.disabled = false;
+                    }
+                }
+            });
+        });
+    }
+
+    carregarPainel();
+</script>
+</body>
+</html>
