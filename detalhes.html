@@ -10,7 +10,6 @@
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
     
     <style>
-        /* Correção para o calendário aparecer na frente do card */
         #ui-datepicker-div { z-index: 9999 !important; }
         .ui-datepicker { background: #fff; border: 1px solid #ddd; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; padding: 10px; }
         .imovel-img { height: 450px; object-fit: cover; border-radius: 12px; }
@@ -33,7 +32,6 @@
     </div>
 
     <div id="main-content" class="row d-none">
-        
         <div class="col-md-8">
             <img id="imovel-img" src="" class="img-fluid w-100 imovel-img mb-4" alt="Imóvel">
             
@@ -74,8 +72,7 @@
                     </form>
                 </div>
 
-                <div id="lista-avaliacoes" class="list-group list-group-flush mt-3">
-                    </div>
+                <div id="lista-avaliacoes" class="list-group list-group-flush mt-3"></div>
             </div>
         </div>
 
@@ -105,7 +102,6 @@
                 </form>
             </div>
         </div>
-
     </div>
 </div>
 
@@ -123,17 +119,16 @@
     const imovelId = urlParams.get('id');
 
     let precoDiaria = 0;
-    let usuarioLogadoId = null;
+    let usuarioLogadoId = null; // Agora armazenará o UUID
     let donoId = null;
 
     async function init() {
         if (!imovelId) { window.location.href = 'index.html'; return; }
 
-        // 1. Verificar Autenticação
+        // 1. Verificar Autenticação (OPÇÃO 2: PEGANDO UUID DIRETO)
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-            const { data: userDb } = await supabase.from('usuarios').select('id').eq('email', user.email).single();
-            usuarioLogadoId = userDb?.id;
+            usuarioLogadoId = user.id; // UUID nativo do Supabase
         }
 
         // 2. Buscar Dados do Imóvel
@@ -150,7 +145,7 @@
         document.getElementById('imovel-descricao').innerText = imovel.descricao;
         document.getElementById('imovel-preco').innerText = precoDiaria.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
-        // Botão de Chat (Só aparece se for logado e NÃO for o dono)
+        // Botão de Chat (Só aparece se estiver logado e NÃO for o dono do imóvel)
         if (usuarioLogadoId && usuarioLogadoId !== donoId) {
             document.getElementById('chat-btn-area').innerHTML = `
                 <a href="chat.html?imovel_id=${imovelId}&destinatario_id=${donoId}" class="btn btn-outline-danger">
@@ -162,13 +157,18 @@
         document.getElementById('loader').classList.add('d-none');
         document.getElementById('main-content').classList.remove('d-none');
 
-        // Carregar as avaliações
         carregarAvaliacoes();
     }
 
     // --- AVALIAÇÕES ---
     async function carregarAvaliacoes() {
-        const { data: avs } = await supabase.from('avaliacoes').select('*, usuarios(nome)').eq('imovel_id', imovelId).order('data_avaliacao', { ascending: false });
+        // Buscamos as avaliações. 
+        // Nota: Certifique-se que sua tabela 'avaliacoes' tenha 'usuario_id' como UUID.
+        const { data: avs } = await supabase
+            .from('avaliacoes')
+            .select('*, usuarios(nome)') 
+            .eq('imovel_id', imovelId)
+            .order('data_avaliacao', { ascending: false });
         
         const lista = document.getElementById('lista-avaliacoes');
         const mediaSpan = document.getElementById('media-nota');
@@ -181,10 +181,14 @@
             let soma = 0;
             avs.forEach(av => {
                 soma += av.nota;
+                // Se a relação usuarios(nome) falhar por causa da mudança de IDs, 
+                // verifique se o 'id' na tabela 'usuarios' também foi mudado para UUID.
+                const nomeExibicao = av.usuarios?.nome || "Usuário";
+                
                 lista.innerHTML += `
                     <div class="list-group-item px-0 py-3 bg-transparent border-0 border-bottom">
                         <div class="d-flex justify-content-between">
-                            <span class="fw-bold">${av.usuarios.nome}</span>
+                            <span class="fw-bold">${nomeExibicao}</span>
                             <span class="text-warning">⭐ ${av.nota}</span>
                         </div>
                         <p class="mb-0 text-muted small mt-1">${av.comentario || 'Sem comentário.'}</p>
@@ -198,18 +202,27 @@
 
     document.getElementById('form-avaliacao').addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!usuarioLogadoId) return;
+
         const btn = document.getElementById('btn-enviar-av');
         btn.disabled = true;
 
         const { error } = await supabase.from('avaliacoes').upsert({
             imovel_id: imovelId,
-            usuario_id: usuarioLogadoId,
+            usuario_id: usuarioLogadoId, // Enviando o UUID
             nota: document.getElementById('nota').value,
             comentario: document.getElementById('comentario').value
         });
 
-        if (error) { alert("Erro ao avaliar: " + error.message); btn.disabled = false; }
-        else { alert("Avaliação salva!"); carregarAvaliacoes(); btn.disabled = false; }
+        if (error) { 
+            alert("Erro ao avaliar: " + error.message); 
+            btn.disabled = false; 
+        } else { 
+            alert("Avaliação salva!"); 
+            carregarAvaliacoes(); 
+            btn.disabled = false; 
+            document.getElementById('comentario').value = '';
+        }
     });
 
     // --- RESERVAS & CALENDÁRIO ---
@@ -249,7 +262,7 @@
 
         const { error } = await supabase.from('reservas').insert([{
             imovel_id: imovelId,
-            usuario_id: usuarioLogadoId,
+            usuario_id: usuarioLogadoId, // Enviando o UUID correto
             data_inicio: $("#checkin").val(),
             data_fim: $("#checkout").val(),
             dias: res.dias,
@@ -258,8 +271,13 @@
             status: 'Confirmada'
         }]);
 
-        if (error) { alert(error.message); btn.disabled = false; btn.innerText = "Reservar agora"; }
-        else { window.location.href = 'minhas_viagens.html'; }
+        if (error) { 
+            alert("Erro na reserva: " + error.message); 
+            btn.disabled = false; 
+            btn.innerText = "Reservar agora"; 
+        } else { 
+            window.location.href = 'minhas_viagens.html'; 
+        }
     });
 
     init();
