@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criar Conta - Home Sweet Home</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-4">
+            <div class="card shadow p-4 border-0">
+                <h3 class="text-center mb-4 text-danger fw-bold">Criar Conta</h3>
+                
+                <div id="msg-erro"></div> <form id="form-cadastro">
+                    <div class="mb-3">
+                        <label>Nome Completo</label>
+                        <input type="text" id="nome" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Email</label>
+                        <input type="email" id="email" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Senha</label>
+                        <input type="password" id="senha" class="form-control" required minlength="6">
+                    </div>
+                    <button type="submit" id="btn-submit" class="btn btn-danger w-100">Cadastrar</button>
+                </form>
+                
+                <p class="mt-3 text-center small">
+                    Já tem conta? <a href="login.html" class="text-danger text-decoration-none">Faça login</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+    // Lembre-se de colocar suas chaves aqui também
+    const supabaseUrl = 'https://drlnbbodugxkndtpomfa.supabase.co'
+    const supabaseKey = 'sb_publishable_uxQbUyjsM-DgKapQzvE32Q_ZUNBtdp1'
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    document.getElementById('form-cadastro').addEventListener('submit', async (e) => {
+        e.preventDefault(); // Evita que a página recarregue
+        
+        const btn = document.getElementById('btn-submit');
+        const msgDiv = document.getElementById('msg-erro');
+        
+        const nome = document.getElementById('nome').value;
+        const email = document.getElementById('email').value;
+        const senha = document.getElementById('senha').value;
+
+        btn.disabled = true;
+        btn.innerText = "Cadastrando...";
+        msgDiv.innerHTML = "";
+
+        // 1. Cria o usuário no sistema de autenticação do Supabase
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+            email: email,
+            password: senha,
+            options: {
+                data: { nome: nome } // Guarda o nome junto com a sessão
+            }
+        });
+
+        if (authError) {
+            msgDiv.innerHTML = `<div class='alert alert-danger'>Erro: ${authError.message}</div>`;
+            btn.disabled = false;
+            btn.innerText = "Cadastrar";
+            return;
+        }
+
+        // 2. Salva o usuário na sua tabela 'usuarios' para manter os IDs das tabelas funcionando
+        const { error: dbError } = await supabase
+            .from('usuarios')
+            .insert([
+                { nome: nome, email: email, senha: 'senha_protegida_no_auth' }
+            ]);
+
+        if (dbError) {
+            console.error("Aviso: Erro ao copiar para a tabela pública", dbError);
+        }
+
+        alert('Cadastro realizado com sucesso! Faça login.');
+        window.location.href = 'login.html';
+    });
+</script>
+</body>
+</html>

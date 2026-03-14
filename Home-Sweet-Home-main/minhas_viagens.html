@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minhas Viagens - Home Sweet Home</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
+    <div class="container">
+        <a class="navbar-brand text-danger fw-bold" href="index.html">Home Sweet Home</a>
+        <a href="index.html" class="btn btn-outline-dark btn-sm">Voltar</a>
+    </div>
+</nav>
+
+<div class="container mt-5">
+    <h2 class="mb-4">Minhas Viagens</h2>
+    <div class="card shadow border-0">
+        <div class="card-body">
+            <table class="table align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Imóvel</th>
+                        <th>Datas</th>
+                        <th>Valor</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="lista-viagens">
+                    <tr><td colspan="5" class="text-center">Buscando suas viagens...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+    const supabaseUrl = 'https://drlnbbodugxkndtpomfa.supabase.co'
+    const supabaseKey = 'sb_publishable_uxQbUyjsM-DgKapQzvE32Q_ZUNBtdp1'
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    async function carregarViagens() {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { window.location.href = 'login.html'; return; }
+
+        const { data: usuarioDb } = await supabase.from('usuarios').select('id').eq('email', user.email).single();
+        
+        // Buscamos o dono_id dentro do objeto imoveis
+        const { data: viagens, error } = await supabase
+            .from('reservas')
+            .select('*, imoveis(titulo, cidade, dono_id)')
+            .eq('usuario_id', usuarioDb.id)
+            .order('data_inicio', { ascending: false });
+
+        const tbody = document.getElementById('lista-viagens');
+        tbody.innerHTML = '';
+
+        if (viagens.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">Nenhuma reserva encontrada.</td></tr>';
+            return;
+        }
+
+        viagens.forEach(res => {
+            const tr = document.createElement('tr');
+            const statusBadge = res.status === 'Cancelada' ? 'bg-danger' : 'bg-success';
+            
+            tr.innerHTML = `
+                <td><strong>${res.imoveis.titulo}</strong><br><small>${res.imoveis.cidade}</small></td>
+                <td>${new Date(res.data_inicio).toLocaleDateString('pt-BR')} - ${new Date(res.data_fim).toLocaleDateString('pt-BR')}</td>
+                <td>R$ ${parseFloat(res.valor_total).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                <td><span class="badge ${statusBadge}">${res.status}</span></td>
+                <td>
+                    <a href="chat.html?imovel_id=${res.imovel_id}&destinatario_id=${res.imoveis.dono_id}" class="btn btn-sm btn-primary">Chat</a>
+                    ${res.status !== 'Cancelada' ? `<button class="btn btn-sm btn-outline-danger btn-cancelar" data-id="${res.id}">Cancelar</button>` : ''}
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        document.querySelectorAll('.btn-cancelar').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                if(confirm('Deseja cancelar esta viagem?')) {
+                    await supabase.from('reservas').update({ status: 'Cancelada' }).eq('id', e.target.dataset.id);
+                    location.reload();
+                }
+            });
+        });
+    }
+    carregarViagens();
+</script>
+</body>
+</html>
