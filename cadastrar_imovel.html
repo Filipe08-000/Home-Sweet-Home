@@ -57,99 +57,48 @@
 </div>
 
 <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+    // ... (suas importações e config do supabase)
 
-    const supabaseUrl = 'https://drlnbbodugxkndtpomfa.supabase.co'
-    const supabaseKey = 'sb_publishable_uxQbUyjsM-DgKapQzvE32Q_ZUNBtdp1'
-    const supabase = createClient(supabaseUrl, supabaseKey)
-
-    // Variável para guardar quem é o usuário logado
     let usuarioLogadoId = null;
 
-    // 1. Verifica se a pessoa está logada antes de deixar ela cadastrar
     async function verificarAutenticacao() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
             alert("Você precisa estar logado para anunciar um imóvel.");
             window.location.href = 'login.html';
         } else {
-            // Guarda o ID interno do banco se for preciso, mas vamos usar o ID do Auth ou do e-mail.
-            // Para mantermos seu banco intacto, vamos buscar o ID da sua tabela 'usuarios'
-            const { data: usuarioDb } = await supabase
-                .from('usuarios')
-                .select('id')
-                .eq('email', user.email)
-                .single();
-            
-            if (usuarioDb) {
-                usuarioLogadoId = usuarioDb.id;
-            } else {
-                alert("Erro ao identificar seu usuário.");
-            }
+            // USANDO O UUID DIRETO DO AUTH
+            usuarioLogadoId = user.id; 
         }
     }
 
     verificarAutenticacao();
 
-    // 2. Ação de envio do formulário
     document.getElementById('form-imovel').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
-        const btn = document.getElementById('btn-submit');
-        const msgDiv = document.getElementById('msg-status');
-        
-        btn.disabled = true;
-        btn.innerText = "Fazendo upload da imagem...";
-        msgDiv.innerHTML = "";
-
-        const titulo = document.getElementById('titulo').value;
-        const cidade = document.getElementById('cidade').value;
-        const descricao = document.getElementById('descricao').value;
-        const preco = document.getElementById('preco').value;
-        const arquivoInput = document.getElementById('imagem');
-        const arquivo = arquivoInput.files[0];
+        // ... (pegar valores do formulário)
 
         try {
-            // Passo 3: Criar um nome único para a imagem (igual você fazia com o time() no PHP)
-            const extensao = arquivo.name.split('.').pop();
-            const nomeImagem = `${Date.now()}_${Math.random().toString(36).substring(7)}.${extensao}`;
+            // ... (lógica de upload da imagem)
 
-            // Passo 4: Fazer o upload para o Supabase Storage
-            const { error: uploadError } = await supabase.storage
-                .from('imoveis-imagens')
-                .upload(nomeImagem, arquivo);
-
-            if (uploadError) throw uploadError;
-
-            btn.innerText = "Salvando no banco de dados...";
-
-            // Passo 5: Salvar os dados na tabela 'imoveis'
+            // SALVANDO NO BANCO
             const { error: dbError } = await supabase
                 .from('imoveis')
                 .insert([
                     {
-                        dono_id: usuarioLogadoId,
+                        dono_id: usuarioLogadoId, // Agora enviando o UUID correto
                         titulo: titulo,
                         cidade: cidade,
                         descricao: descricao,
                         preco_diaria: preco,
-                        imagem: nomeImagem // Salvamos apenas o nome do arquivo, como no seu PHP
+                        imagem: nomeImagem
                     }
                 ]);
 
             if (dbError) throw dbError;
-
-            // Sucesso!
-            msgDiv.innerHTML = `<div class='alert alert-success'>Imóvel cadastrado com sucesso! Redirecionando...</div>`;
-            setTimeout(() => {
-                window.location.href = 'index.html'; // Manda pro início para ver o anúncio
-            }, 2000);
-
+            // ... (sucesso)
         } catch (erro) {
-            console.error(erro);
-            msgDiv.innerHTML = `<div class='alert alert-danger'>Erro: ${erro.message}</div>`;
-            btn.disabled = false;
-            btn.innerText = "Cadastrar Imóvel";
+            // ... (tratar erro)
         }
     });
 </script>
