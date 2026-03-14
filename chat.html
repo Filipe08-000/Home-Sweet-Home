@@ -52,26 +52,25 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     const imovelId = urlParams.get('imovel_id');
-    const destinatarioId = urlParams.get('destinatario_id');
+    const destinatarioId = urlParams.get('destinatario_id'); // Este ID agora deve ser o UUID
 
     let meuIdInterno = null;
 
     async function iniciarChat() {
+        // 1. Pega o UUID diretamente da autenticação (Opção 2)
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { window.location.href = 'login.html'; return; }
 
-        // 1. Pega meu ID na tabela pública 'usuarios'
-        const { data: euDb } = await supabase.from('usuarios').select('id').eq('email', user.email).single();
-        meuIdInterno = euDb.id;
+        meuIdInterno = user.id;
 
-        // 2. Busca info do outro usuário e do imóvel
+        // 2. Busca info do outro usuário (pela tabela pública) e do imóvel
         const { data: outro } = await supabase.from('usuarios').select('nome').eq('id', destinatarioId).single();
         const { data: imovel } = await supabase.from('imoveis').select('titulo').eq('id', imovelId).single();
         
-        document.getElementById('chat-with').innerText = `Conversa com ${outro.nome}`;
-        document.getElementById('imovel-name').innerText = imovel.titulo;
+        if (outro) document.getElementById('chat-with').innerText = `Conversa com ${outro.nome}`;
+        if (imovel) document.getElementById('imovel-name').innerText = imovel.titulo;
 
-        // 3. Carrega histórico de mensagens (o antigo SELECT do chat.php)
+        // 3. Carrega histórico de mensagens usando filtros de UUID
         const { data: historico } = await supabase
             .from('mensagens')
             .select('*')
@@ -82,7 +81,7 @@
         historico?.forEach(msg => renderMsg(msg));
         scrollChat();
 
-        // 4. 🔥 A MÁGICA: ESCUTAR MENSAGENS NOVAS EM TEMPO REAL
+        // 4. Configuração do Realtime
         supabase
             .channel('chat_realtime')
             .on('postgres_changes', { 
@@ -92,9 +91,12 @@
                 filter: `imovel_id=eq.${imovelId}` 
             }, payload => {
                 const novaMsg = payload.new;
-                // Só renderiza se for parte DESTA conversa específica
-                if ((novaMsg.remetente_id == destinatarioId && novaMsg.destinatario_id == meuIdInterno) ||
-                    (novaMsg.remetente_id == meuIdInterno && novaMsg.destinatario_id == destinatarioId)) {
+                
+                // Comparação de strings (UUIDs)
+                const envolviaEu = novaMsg.remetente_id === meuIdInterno || novaMsg.destinatario_id === meuIdInterno;
+                const envolviaOutro = novaMsg.remetente_id === destinatarioId || novaMsg.destinatario_id === destinatarioId;
+
+                if (envolviaEu && envolviaOutro) {
                     renderMsg(novaMsg);
                     scrollChat();
                 }
@@ -104,7 +106,8 @@
 
     function renderMsg(msg) {
         const container = document.getElementById('chat-window');
-        const souEu = msg.remetente_id == meuIdInterno;
+        // Comparação de UUID (String)
+        const souEu = msg.remetente_id === meuIdInterno;
         const div = document.createElement('div');
         div.className = `msg ${souEu ? 'msg-me' : 'msg-them'}`;
         
@@ -127,12 +130,14 @@
         e.preventDefault();
         const input = document.getElementById('input-msg');
         const texto = input.value;
+        if (!texto.trim()) return;
+        
         input.value = '';
 
         const { error } = await supabase.from('mensagens').insert([{
             imovel_id: imovelId,
-            remetente_id: meuIdInterno,
-            destinatario_id: destinatarioId,
+            remetente_id: meuIdInterno, // Enviando UUID
+            destinatario_id: destinatarioId, // Enviando UUID
             texto: texto
         }]);
 
