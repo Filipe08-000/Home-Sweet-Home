@@ -66,30 +66,18 @@
     // Variável para guardar quem é o usuário logado
     let usuarioLogadoId = null;
 
-    // 1. Verifica se a pessoa está logada antes de deixar ela cadastrar
-    async function verificarAutenticacao() {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-            alert("Você precisa estar logado para anunciar um imóvel.");
-            window.location.href = 'login.html';
-        } else {
-            // Guarda o ID interno do banco se for preciso, mas vamos usar o ID do Auth ou do e-mail.
-            // Para mantermos seu banco intacto, vamos buscar o ID da sua tabela 'usuarios'
-            const { data: usuarioDb } = await supabase
-                .from('usuarios')
-                .select('id')
-                .eq('email', user.email)
-                .single();
-            
-            if (usuarioDb) {
-                usuarioLogadoId = usuarioDb.id;
-            } else {
-                alert("Erro ao identificar seu usuário.");
-            }
-        }
+// 1. Verifica se a pessoa está logada antes de deixar ela cadastrar
+async function verificarAutenticacao() {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+        alert("Você precisa estar logado para anunciar um imóvel.");
+        window.location.href = 'login.html';
+    } else {
+        // Usa o UUID padrão do Supabase Auth diretamente!
+        usuarioLogadoId = user.id; 
     }
-
-    verificarAutenticacao();
+}
 
     // 2. Ação de envio do formulário
     document.getElementById('form-imovel').addEventListener('submit', async (e) => {
