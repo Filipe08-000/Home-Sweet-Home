@@ -10,7 +10,6 @@
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
     
     <style>
-        /* Correção para o calendário aparecer na frente do card */
         #ui-datepicker-div { z-index: 9999 !important; }
         .ui-datepicker { background: #fff; border: 1px solid #ddd; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; padding: 10px; }
         .imovel-img { height: 450px; object-fit: cover; border-radius: 12px; }
@@ -52,7 +51,6 @@
 
             <div class="mt-4">
                 <h4 class="fw-bold">Avaliações (<span id="total-avaliacoes">0</span>) - ⭐ <span id="media-nota">0.0</span></h4>
-                
                 <div id="area-minha-avaliacao" class="d-none border p-3 rounded mb-4 bg-white shadow-sm">
                     <h6 class="fw-bold mb-3">O que você achou da sua estadia?</h6>
                     <form id="form-avaliacao">
@@ -73,9 +71,7 @@
                         <button type="submit" id="btn-enviar-av" class="btn btn-dark btn-sm mt-2">Enviar Avaliação</button>
                     </form>
                 </div>
-
-                <div id="lista-avaliacoes" class="list-group list-group-flush mt-3">
-                    </div>
+                <div id="lista-avaliacoes" class="list-group list-group-flush mt-3"></div>
             </div>
         </div>
 
@@ -83,9 +79,7 @@
             <div class="card shadow border-0 p-4 sticky-card">
                 <h3 class="fw-bold text-danger">R$ <span id="imovel-preco">0,00</span> <span class="fs-6 text-muted fw-normal">/ noite</span></h3>
                 <hr>
-                
                 <div id="msg-reserva"></div>
-
                 <form id="form-reserva">
                     <div class="mb-3">
                         <label class="small fw-bold text-uppercase text-muted">Check-in</label>
@@ -95,17 +89,14 @@
                         <label class="small fw-bold text-uppercase text-muted">Check-out</label>
                         <input type="text" id="checkout" class="form-control" placeholder="Selecione" readonly required>
                     </div>
-                    
                     <div class="d-flex justify-content-between mt-4 p-2 bg-light rounded">
                         <span class="fw-bold">Total estimado:</span>
                         <span id="total-display" class="text-success fw-bold">R$ 0,00</span>
                     </div>
-
                     <button type="submit" id="btn-reservar" class="btn btn-danger w-100 mt-4 py-2 fs-5 fw-bold">Reservar agora</button>
                 </form>
             </div>
         </div>
-
     </div>
 </div>
 
@@ -124,35 +115,29 @@
 
     let precoDiaria = 0;
     let usuarioLogadoId = null;
-    let donoId = null;
 
     async function init() {
         if (!imovelId) { window.location.href = 'index.html'; return; }
 
-        // 1. Verificar Autenticação (Usando UUID direto do Auth)
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-            usuarioLogadoId = user.id; // Pegando o UUID diretamente
+            usuarioLogadoId = user.id;
         }
 
-        // 2. Buscar Dados do Imóvel
         const { data: imovel, error } = await supabase.from('imoveis').select('*').eq('id', imovelId).single();
         if (error || !imovel) { alert("Imóvel não encontrado!"); return; }
 
         precoDiaria = parseFloat(imovel.preco_diaria);
-        donoId = imovel.dono_id;
 
-        // Preencher UI
         document.getElementById('imovel-img').src = `${supabaseUrl}/storage/v1/object/public/imoveis-imagens/${imovel.imagem}`;
         document.getElementById('imovel-titulo').innerText = imovel.titulo;
         document.getElementById('imovel-cidade').innerText = imovel.cidade;
         document.getElementById('imovel-descricao').innerText = imovel.descricao;
         document.getElementById('imovel-preco').innerText = precoDiaria.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
-        // Botão de Chat (Só aparece se for logado e NÃO for o dono)
-        if (usuarioLogadoId && usuarioLogadoId !== donoId) {
+        if (usuarioLogadoId && usuarioLogadoId !== imovel.dono_id) {
             document.getElementById('chat-btn-area').innerHTML = `
-                <a href="chat.html?imovel_id=${imovelId}&destinatario_id=${donoId}" class="btn btn-outline-danger">
+                <a href="chat.html?imovel_id=${imovelId}&destinatario_id=${imovel.dono_id}" class="btn btn-outline-danger">
                     <i class="bi bi-chat-dots"></i> Falar com Anfitrião
                 </a>`;
             document.getElementById('area-minha-avaliacao').classList.remove('d-none');
@@ -160,83 +145,29 @@
 
         document.getElementById('loader').classList.add('d-none');
         document.getElementById('main-content').classList.remove('d-none');
-
-        // Carregar as avaliações
         carregarAvaliacoes();
     }
 
-    // --- AVALIAÇÕES ---
     async function carregarAvaliacoes() {
-        // Buscamos as avaliações. 
-        // Nota: Se você não tiver a tabela usuarios vinculada corretamente por UUID, 
-        // talvez precise ajustar o .select() para apenas '*' por enquanto.
-        const { data: avs } = await supabase
-            .from('avaliacoes')
-            .select('*') 
-            .eq('imovel_id', imovelId)
-            .order('created_at', { ascending: false });
-        
+        const { data: avs } = await supabase.from('avaliacoes').select('*').eq('imovel_id', imovelId);
         const lista = document.getElementById('lista-avaliacoes');
-        const mediaSpan = document.getElementById('media-nota');
-        const totalSpan = document.getElementById('total-avaliacoes');
-        
         lista.innerHTML = '';
-        totalSpan.innerText = avs?.length || 0;
-
         if (avs && avs.length > 0) {
             let soma = 0;
             avs.forEach(av => {
                 soma += av.nota;
-                lista.innerHTML += `
-                    <div class="list-group-item px-0 py-3 bg-transparent border-0 border-bottom">
-                        <div class="d-flex justify-content-between">
-                            <span class="fw-bold">Usuário</span>
-                            <span class="text-warning">⭐ ${av.nota}</span>
-                        </div>
-                        <p class="mb-0 text-muted small mt-1">${av.comentario || 'Sem comentário.'}</p>
-                    </div>`;
+                lista.innerHTML += `<div class="border-bottom py-2">⭐ ${av.nota} - ${av.comentario || ''}</div>`;
             });
-            mediaSpan.innerText = (soma / avs.length).toFixed(1);
-        } else {
-            lista.innerHTML = '<p class="text-muted small">Ainda não há avaliações para este lugar.</p>';
+            document.getElementById('media-nota').innerText = (soma / avs.length).toFixed(1);
+            document.getElementById('total-avaliacoes').innerText = avs.length;
         }
     }
 
-    document.getElementById('form-avaliacao').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = document.getElementById('btn-enviar-av');
-        
-        if (!usuarioLogadoId) {
-            alert("Faça login para avaliar.");
-            return;
-        }
-
-        btn.disabled = true;
-
-        const { error } = await supabase.from('avaliacoes').insert({
-            imovel_id: imovelId,
-            usuario_id: usuarioLogadoId, // Enviando o UUID
-            nota: parseInt(document.getElementById('nota').value),
-            comentario: document.getElementById('comentario').value
-        });
-
-        if (error) { 
-            alert("Erro ao avaliar: " + error.message); 
-            btn.disabled = false; 
-        } else { 
-            alert("Avaliação salva!"); 
-            carregarAvaliacoes(); 
-            btn.disabled = false; 
-            document.getElementById('comentario').value = '';
-        }
-    });
-
-    // --- RESERVAS & CALENDÁRIO ---
     function calc() {
         const d1 = $("#checkin").datepicker('getDate');
         const d2 = $("#checkout").datepicker('getDate');
         if (d1 && d2 && d2 > d1) {
-            const dias = (d2 - d1) / (1000 * 60 * 60 * 24);
+            const dias = Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
             const total = dias * precoDiaria;
             $("#total-display").text("R$ " + total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }));
             return { dias, total };
@@ -245,52 +176,37 @@
     }
 
     $(function() {
-        $.datepicker.setDefaults({
-            dateFormat: 'yy-mm-dd',
-            dayNames: ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'],
-            monthNames: ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
-        });
-
-        $("#checkin").datepicker({ 
-            minDate: 0,
-            onSelect: function(date) {
-                var dt = new Date(date); dt.setDate(dt.getDate() + 1);
-                $("#checkout").datepicker("option", "minDate", dt);
-                calc();
-            }
-        });
-        $("#checkout").datepicker({ minDate: 1, onSelect: calc });
+        $("#checkin").datepicker({ minDate: 0, dateFormat: 'yy-mm-dd', onSelect: function() { calc(); } });
+        $("#checkout").datepicker({ minDate: 1, dateFormat: 'yy-mm-dd', onSelect: function() { calc(); } });
     });
 
     document.getElementById('form-reserva').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
-        // Verificação final de segurança
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { window.location.href = 'login.html'; return; }
+        if (!usuarioLogadoId) { window.location.href = 'login.html'; return; }
 
         const res = calc();
-        if (!res) { alert("Selecione as datas corretamente."); return; }
+        if (!res) { alert("Datas inválidas"); return; }
 
         const btn = document.getElementById('btn-reservar');
-        btn.disabled = true; btn.innerText = "Reservando...";
+        btn.disabled = true;
 
+        // CORREÇÃO: Enviando o campo 'dias' que o seu banco exige
         const { error } = await supabase.from('reservas').insert([{
             imovel_id: imovelId,
-            usuario_id: user.id, // UUID direto
+            usuario_id: usuarioLogadoId,
             data_inicio: $("#checkin").val(),
             data_fim: $("#checkout").val(),
+            dias: res.dias, // AGORA O CAMPO DIAS ESTÁ AQUI
             valor_total: res.total,
-            metodo_pagamento: 'Combinar',
-            status: 'Confirmada'
+            status: 'Confirmada',
+            metodo_pagamento: 'Combinar'
         }]);
 
         if (error) { 
             alert("Erro: " + error.message); 
             btn.disabled = false; 
-            btn.innerText = "Reservar agora"; 
         } else { 
-            alert("Reserva confirmada!");
+            alert("Reserva feita!");
             window.location.href = 'minhas_viagens.html'; 
         }
     });
