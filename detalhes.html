@@ -129,11 +129,10 @@
     async function init() {
         if (!imovelId) { window.location.href = 'index.html'; return; }
 
-        // 1. Verificar Autenticação
+        // 1. Verificar Autenticação (Usando UUID direto do Auth)
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-            const { data: userDb } = await supabase.from('usuarios').select('id').eq('email', user.email).single();
-            usuarioLogadoId = userDb?.id;
+            usuarioLogadoId = user.id; // Pegando o UUID diretamente
         }
 
         // 2. Buscar Dados do Imóvel
@@ -168,7 +167,14 @@
 
     // --- AVALIAÇÕES ---
     async function carregarAvaliacoes() {
-        const { data: avs } = await supabase.from('avaliacoes').select('*, usuarios(nome)').eq('imovel_id', imovelId).order('data_avaliacao', { ascending: false });
+        // Buscamos as avaliações. 
+        // Nota: Se você não tiver a tabela usuarios vinculada corretamente por UUID, 
+        // talvez precise ajustar o .select() para apenas '*' por enquanto.
+        const { data: avs } = await supabase
+            .from('avaliacoes')
+            .select('*') 
+            .eq('imovel_id', imovelId)
+            .order('created_at', { ascending: false });
         
         const lista = document.getElementById('lista-avaliacoes');
         const mediaSpan = document.getElementById('media-nota');
@@ -184,7 +190,7 @@
                 lista.innerHTML += `
                     <div class="list-group-item px-0 py-3 bg-transparent border-0 border-bottom">
                         <div class="d-flex justify-content-between">
-                            <span class="fw-bold">${av.usuarios.nome}</span>
+                            <span class="fw-bold">Usuário</span>
                             <span class="text-warning">⭐ ${av.nota}</span>
                         </div>
                         <p class="mb-0 text-muted small mt-1">${av.comentario || 'Sem comentário.'}</p>
@@ -199,17 +205,30 @@
     document.getElementById('form-avaliacao').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = document.getElementById('btn-enviar-av');
+        
+        if (!usuarioLogadoId) {
+            alert("Faça login para avaliar.");
+            return;
+        }
+
         btn.disabled = true;
 
-        const { error } = await supabase.from('avaliacoes').upsert({
+        const { error } = await supabase.from('avaliacoes').insert({
             imovel_id: imovelId,
-            usuario_id: usuarioLogadoId,
-            nota: document.getElementById('nota').value,
+            usuario_id: usuarioLogadoId, // Enviando o UUID
+            nota: parseInt(document.getElementById('nota').value),
             comentario: document.getElementById('comentario').value
         });
 
-        if (error) { alert("Erro ao avaliar: " + error.message); btn.disabled = false; }
-        else { alert("Avaliação salva!"); carregarAvaliacoes(); btn.disabled = false; }
+        if (error) { 
+            alert("Erro ao avaliar: " + error.message); 
+            btn.disabled = false; 
+        } else { 
+            alert("Avaliação salva!"); 
+            carregarAvaliacoes(); 
+            btn.disabled = false; 
+            document.getElementById('comentario').value = '';
+        }
     });
 
     // --- RESERVAS & CALENDÁRIO ---
@@ -226,40 +245,54 @@
     }
 
     $(function() {
+        $.datepicker.setDefaults({
+            dateFormat: 'yy-mm-dd',
+            dayNames: ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'],
+            monthNames: ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+        });
+
         $("#checkin").datepicker({ 
-            minDate: 0, dateFormat: 'yy-mm-dd',
+            minDate: 0,
             onSelect: function(date) {
                 var dt = new Date(date); dt.setDate(dt.getDate() + 1);
                 $("#checkout").datepicker("option", "minDate", dt);
                 calc();
             }
         });
-        $("#checkout").datepicker({ minDate: 1, dateFormat: 'yy-mm-dd', onSelect: calc });
+        $("#checkout").datepicker({ minDate: 1, onSelect: calc });
     });
 
     document.getElementById('form-reserva').addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (!usuarioLogadoId) { window.location.href = 'login.html'; return; }
+        
+        // Verificação final de segurança
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { window.location.href = 'login.html'; return; }
 
         const res = calc();
-        if (!res) return;
+        if (!res) { alert("Selecione as datas corretamente."); return; }
 
         const btn = document.getElementById('btn-reservar');
         btn.disabled = true; btn.innerText = "Reservando...";
 
         const { error } = await supabase.from('reservas').insert([{
             imovel_id: imovelId,
-            usuario_id: usuarioLogadoId,
+            usuario_id: user.id, // UUID direto
             data_inicio: $("#checkin").val(),
             data_fim: $("#checkout").val(),
-            dias: res.dias,
             valor_total: res.total,
             metodo_pagamento: 'Combinar',
             status: 'Confirmada'
         }]);
 
-        if (error) { alert(error.message); btn.disabled = false; btn.innerText = "Reservar agora"; }
-        else { window.location.href = 'minhas_viagens.html'; }
+        if (error) { 
+            alert("Erro: " + error.message); 
+            btn.disabled = false; 
+            btn.innerText = "Reservar agora"; 
+        } else { 
+            alert("Reserva confirmada!");
+            window.location.href = 'minhas_viagens.html'; 
+        }
     });
 
     init();
