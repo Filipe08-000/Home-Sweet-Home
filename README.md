@@ -1,31 +1,32 @@
 # 🏡 Home-Sweet-Home
 
-Uma plataforma digital de intermediação de locação de imóveis focada em estadias por temporada, operando sob um modelo de negócio semelhante ao Airbnb. 
+Uma plataforma digital de intermediação de locação de imóveis focada em estadias por temporada, operando sob um modelo de negócio dinâmico (estilo Airbnb). 
 
-🔗 **Acesse a aplicação online:** [Home-Sweet-Home no GitHub Pages](https://filipe08-000.github.io/Home-Sweet-Home/)
+🔗 **Acesso à Aplicação:** [Visite o Home-Sweet-Home no GitHub Pages](https://filipe08-000.github.io/Home-Sweet-Home/)
 
-## 🚀 O Projeto
-O objetivo principal é atuar como um marketplace eficiente, conectando locadores e locatários. O projeto nasceu com uma arquitetura monolítica local e hoje evoluiu para uma infraestrutura em nuvem, eliminando a dependência do XAMPP e utilizando banco de dados como serviço (BaaS).
+## 🚀 Arquitetura e Tecnologia
+O projeto evoluiu de um monólito local para uma arquitetura **Serverless (Sem Servidor)** em nuvem, garantindo alta disponibilidade e eliminando a necessidade de configurações locais complexas.
 
-## 🛠️ Tecnologias Utilizadas
-* **Frontend:** HTML, CSS, JavaScript (Hospedado via GitHub Pages)
-* **Backend:** PHP (API RESTful em desenvolvimento)
-* **Banco de Dados:** PostgreSQL via [Supabase](https://supabase.com/)
-* **Controle de Concorrência:** Transações ACID com `SELECT FOR UPDATE` para evitar condições de corrida durante as reservas.
+* **Frontend:** HTML5, CSS3 (Bootstrap 5), JavaScript puro (ESModules).
+* **Backend as a Service (BaaS):** [Supabase](https://supabase.com/)
+* **Banco de Dados:** PostgreSQL (Hospedado na nuvem)
+* **Storage:** Supabase Storage (para imagens dos imóveis)
+* **Segurança e Concorrência:** Autenticação via Supabase Auth e controle nativo de *Overbooking* (condição de corrida) via Transações ACID e funções RPC no banco de dados (`SELECT FOR UPDATE`).
 
-## ✨ Funcionalidades Atuais (Core)
-- [x] Autenticação e Gestão de Usuários (Locadores e Locatários).
-- [x] CRUD de Imóveis (Cadastro, listagem, edição e exclusão).
-- [x] Sistema de busca e visualização do catálogo.
-- [x] Motor de reservas com bloqueio de concorrência no banco de dados.
+## ✨ Funcionalidades (Core)
+- [x] Autenticação segura de usuários.
+- [x] CRUD de imóveis com upload de imagens reais.
+- [x] Motor de reservas com cálculo automático de diárias.
+- [x] Painel de gestão exclusivo para Anfitriões e Hóspedes.
+- [x] Chat em tempo real (WebSockets) entre locador e locatário.
+- [x] Sistema de avaliações e notas das acomodações.
 
 ## ⚙️ Como executar localmente
-Como o projeto migrou para a nuvem, a execução está muito mais simples:
-1. Faça o clone deste repositório: `git clone https://github.com/Filipe08-000/Home-Sweet-Home.git`
-2. Abra o arquivo `index.html` em seu navegador ou utilize a extensão Live Server do VSCode.
-3. *Nota: As credenciais de acesso ao Supabase são gerenciadas no backend e não exigem configuração de banco de dados local.*
+A infraestrutura em nuvem simplificou o ambiente de desenvolvimento. Para testar o sistema:
 
-## 📈 Próximos Passos (Roadmap)
-* Finalizar a documentação completa da API REST.
-* Inclusão do Diagrama de Entidade-Relacionamento (DER).
-* Implementação de testes automatizados de estresse e concorrência.
+1. Faça o clone deste repositório: `git clone https://github.com/Filipe08-000/Home-Sweet-Home.git`
+2. Não é necessário instalar o XAMPP ou rodar scripts SQL, pois o banco de dados já está operando na nuvem.
+3. Abra o arquivo `index.html` em qualquer navegador web moderno ou utilize a extensão *Live Server* do VSCode.
+
+## 📚 Documentação
+* Leia o nosso [Manual do Usuário](./MANUAL_DO_USUARIO.md) para entender como operar a plataforma.
