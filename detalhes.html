@@ -83,11 +83,11 @@
                 <form id="form-reserva">
                     <div class="mb-3">
                         <label class="small fw-bold text-uppercase text-muted">Check-in</label>
-                        <input type="text" id="checkin" class="form-control" placeholder="Selecione" readonly required>
+                        <input type="text" id="checkin" class="form-control" placeholder="AAAA-MM-DD" required>
                     </div>
                     <div class="mb-3">
                         <label class="small fw-bold text-uppercase text-muted">Check-out</label>
-                        <input type="text" id="checkout" class="form-control" placeholder="Selecione" readonly required>
+                        <input type="text" id="checkout" class="form-control" placeholder="AAAA-MM-DD" required>
                     </div>
                     <div class="d-flex justify-content-between mt-4 p-2 bg-light rounded">
                         <span class="fw-bold">Total estimado:</span>
@@ -175,9 +175,19 @@
         return null;
     }
 
+    // Configuração do calendário atualizada para aceitar digitação
     $(function() {
-        $("#checkin").datepicker({ minDate: 0, dateFormat: 'yy-mm-dd', onSelect: function() { calc(); } });
-        $("#checkout").datepicker({ minDate: 1, dateFormat: 'yy-mm-dd', onSelect: function() { calc(); } });
+        $("#checkin").datepicker({ 
+            minDate: 0, 
+            dateFormat: 'yy-mm-dd', 
+            onSelect: function() { calc(); } 
+        }).on('change', function() { calc(); });
+
+        $("#checkout").datepicker({ 
+            minDate: 1, 
+            dateFormat: 'yy-mm-dd', 
+            onSelect: function() { calc(); } 
+        }).on('change', function() { calc(); });
     });
 
     document.getElementById('form-reserva').addEventListener('submit', async (e) => {
@@ -190,13 +200,12 @@
         const btn = document.getElementById('btn-reservar');
         btn.disabled = true;
 
-        // CORREÇÃO: Enviando o campo 'dias' que o seu banco exige
         const { error } = await supabase.from('reservas').insert([{
             imovel_id: imovelId,
             usuario_id: usuarioLogadoId,
             data_inicio: $("#checkin").val(),
             data_fim: $("#checkout").val(),
-            dias: res.dias, // AGORA O CAMPO DIAS ESTÁ AQUI
+            dias: res.dias,
             valor_total: res.total,
             status: 'Confirmada',
             metodo_pagamento: 'Combinar'
