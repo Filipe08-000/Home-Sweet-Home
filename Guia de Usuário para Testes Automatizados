@@ -1,0 +1,50 @@
+🏠 Home Sweet Home - Suíte de Testes Automatizados
+Este repositório contém a automação de testes de ponta a ponta (E2E) e testes de performance para a plataforma Home Sweet Home.
+
+🚀 Tecnologias Utilizadas
+Cypress: Automação de interface (E2E).
+
+Mochawesome: Geração de relatórios dinâmicos em HTML.
+
+K6: Testes de carga e performance.
+
+Supabase: Backend as a Service (Banco de Dados e Auth).
+
+🛠️ Configuração do Ambiente
+Pré-requisitos: Ter o Node.js instalado.
+
+Instalação: No terminal, dentro da pasta do projeto, execute:
+
+PowerShell
+npm install
+🧪 Como Executar os Testes
+1. Testes de Interface (Cypress)
+Modo Visual (Para desenvolvimento):
+Se quiser ver o "robô" clicando nos botões em tempo real:
+
+PowerShell
+npx cypress open
+Modo Headless + Relatório (Para entrega):
+Para rodar os testes em segundo plano e gerar o relatório profissional:
+
+PowerShell
+# Executa o fluxo completo de Reserva e Chat
+npx cypress run --reporter mochawesome --spec "cypress/e2e/reserva_chat.cy.js"
+
+# Executa o fluxo de Cadastro e Login
+npx cypress run --reporter mochawesome --spec "cypress/e2e/testefinal.cy.js"
+2. Testes de Performance (K6)
+Para validar a resistência do sistema e limites do API Gateway:
+
+PowerShell
+k6 run teste_carga.js
+📊 Onde encontrar os Relatórios?
+Após rodar o comando do Cypress no modo Headless, os resultados detalhados estarão em:
+cypress/mochawesome-report/mochawesome.html
+
+Dica: Abra este arquivo em qualquer navegador para ver os prints, tempos de execução e o status de cada passo.
+
+📝 Descrição dos Testes Principais
+testefinal.cy.js: Valida o fluxo de segurança, incluindo criação de conta com e-mail dinâmico, login bem-sucedido e bloqueio de credenciais inválidas.
+
+reserva_chat.cy.js: O teste mais crítico do sistema. Ele realiza o cadastro de um novo usuário, faz login, seleciona um imóvel, calcula o preço, realiza a reserva e valida o envio de mensagens no chat em tempo real.
