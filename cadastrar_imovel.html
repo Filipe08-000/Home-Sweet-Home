@@ -69,7 +69,6 @@
         const btn = document.getElementById('btn-cadastrar');
         const msgDiv = document.getElementById('msg-status');
         
-        // 1. Pegar o usuário logado no momento (Isso retorna o UUID correto)
         const { data: { user }, error: authError } = await supabase.auth.getUser();
 
         if (authError || !user) {
@@ -85,15 +84,16 @@
             const fotoFile = document.getElementById('foto').files[0];
             const nomeArquivo = `${Date.now()}_${fotoFile.name}`;
 
-            // 2. Upload da Imagem
-            const { data: imgData, error: imgError } = await supabase.storage
+            // 1. Upload da imagem original
+            const { error: imgError } = await supabase.storage
                 .from('imoveis-imagens')
                 .upload(nomeArquivo, fotoFile);
 
             if (imgError) throw imgError;
 
-            // 3. Cadastro no Banco (Enviando o user.id que é UUID)
-            const { error: dbError } = await supabase
+            // 2. Cadastro do imóvel no banco
+            // IMPORTANTE: aqui pedimos o ID de volta
+            const { data: imovel, error: dbError } = await supabase
                 .from('imoveis')
                 .insert([{
                     titulo: document.getElementById('titulo').value,
@@ -101,12 +101,25 @@
                     descricao: document.getElementById('descricao').value,
                     preco_diaria: parseFloat(document.getElementById('preco').value),
                     imagem: nomeArquivo,
-                    dono_id: user.id // Aqui está a correção: enviando o UUID real
-                }]);
+                    dono_id: user.id,
+                    status_processamento_imagem: 'pendente'
+                }])
+                .select('id')
+                .single();
 
             if (dbError) throw dbError;
 
-            msgDiv.innerHTML = `<div class="alert alert-success">Imóvel cadastrado com sucesso!</div>`;
+            // 3. Enfileirar job de processamento da imagem
+            const { error: jobError } = await supabase
+                .from('jobs_imagem')
+                .insert([{
+                    imovel_id: imovel.id,
+                    caminho_original: nomeArquivo
+                }]);
+
+            if (jobError) throw jobError;
+
+            msgDiv.innerHTML = `<div class="alert alert-success">Imóvel cadastrado com sucesso! Imagem enviada para processamento.</div>`;
             setTimeout(() => window.location.href = 'index.html', 2000);
 
         } catch (erro) {
