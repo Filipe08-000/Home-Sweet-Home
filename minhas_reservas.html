@@ -23,14 +23,13 @@
                 <thead class="table-dark">
                     <tr>
                         <th>Imóvel</th>
-                        <th>Hóspede</th>
                         <th>Datas</th>
                         <th>Status</th>
                         <th>Ações</th>
                     </tr>
                 </thead>
                 <tbody id="lista-reservas">
-                    <tr><td colspan="5" class="text-center">Buscando reservas...</td></tr>
+                    <tr><td colspan="4" class="text-center">Buscando reservas...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -46,32 +45,32 @@
 
     async function carregarReservas() {
         const { data: { user } } = await supabase.auth.getUser();
-        const { data: usuarioDb } = await supabase.from('usuarios').select('id').eq('email', user.email).single();
-
-        const { data: reservas, error } = await supabase
-            .from('reservas')
-            .select('*, imoveis!inner(titulo, dono_id), usuarios(nome)')
-            .eq('imoveis.dono_id', usuarioDb.id)
-            .order('data_inicio', { ascending: false });
+        if (!user) { window.location.href = 'login.html'; return; }
 
         const tbody = document.getElementById('lista-reservas');
+
+        // Busca reservas onde o dono do imóvel sou EU (usando user.id do Auth)
+        const { data: reservas, error } = await supabase
+            .from('reservas')
+            .select('*, imoveis!inner(titulo, dono_id)')
+            .eq('imoveis.dono_id', user.id)
+            .order('data_inicio', { ascending: false });
+
         tbody.innerHTML = '';
 
-        if (!reservas || reservas.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center">Nenhuma reserva recebida.</td></tr>';
+        if (error || !reservas || reservas.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhuma reserva recebida.</td></tr>';
             return;
         }
 
         reservas.forEach(res => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td>${res.imoveis.titulo}</td>
-                <td><strong>${res.usuarios.nome}</strong></td>
+                <td><strong>${res.imoveis.titulo}</strong></td>
                 <td>${new Date(res.data_inicio).toLocaleDateString('pt-BR')} - ${new Date(res.data_fim).toLocaleDateString('pt-BR')}</td>
                 <td><span class="badge ${res.status === 'Cancelada' ? 'bg-danger' : 'bg-success'}">${res.status}</span></td>
                 <td>
-                    <a href="chat.html?imovel_id=${res.imovel_id}&destinatario_id=${res.usuario_id}" class="btn btn-sm btn-primary">Chat</a>
-                    ${res.status !== 'Cancelada' ? `<button class="btn btn-danger btn-sm btn-cancelar-hospede" data-id="${res.id}">Cancelar</button>` : ''}
+                    <button class="btn btn-danger btn-sm btn-cancelar-hospede" data-id="${res.id}">Cancelar</button>
                 </td>
             `;
             tbody.appendChild(tr);
