@@ -25,51 +25,61 @@
     </div>
 </nav>
 
-<div class="container mt-4 mb-5">
-    <h1 id="detalhe-titulo" class="fw-bold mb-2">Carregando imóvel...</h1>
-    <p class="text-muted mb-4"><i class="bi bi-geo-alt-fill text-danger"></i> <span id="detalhe-cidade">...</span></p>
-
-    <div id="carousel-container" class="mb-4">
-        <div class="placeholder-glow">
-            <div class="placeholder col-12 bg-secondary" style="height: 450px; border-radius: 12px;"></div>
-        </div>
-    </div>
-
-    <div class="row mt-4">
+<div class="container mt-5 mb-5">
+    <div class="row">
         <div class="col-md-8">
-            <h3 class="fw-bold border-bottom pb-3">Sobre este espaço</h3>
-            <p id="detalhe-descricao" class="fs-5 text-secondary" style="white-space: pre-line;">Carregando descrição...</p>
+            <h1 class="fw-bold mb-1" id="imovel-titulo">Buscando imóvel...</h1>
+            
+            <div class="d-flex align-items-center mb-4 small">
+                <span class="me-3">
+                    <i class="bi bi-star-fill text-warning"></i> 
+                    <strong id="imovel-nota">4.9</strong> 
+                    <span class="text-muted" id="imovel-avaliacoes">(16 avaliações)</span>
+                </span>
+                <span class="text-muted">
+                    <i class="bi bi-geo-alt-fill"></i> <span id="imovel-cidade">...</span>
+                </span>
+            </div>
+
+            <img id="imovel-imagem" src="https://via.placeholder.com/800x450?text=Carregando+Imagem..." class="img-fluid w-100 imovel-img mb-4" alt="Imagem do Imóvel">
+            
+            <h3 class="fw-bold mb-3">O que este lugar oferece</h3>
+            <p id="imovel-descricao" class="text-muted" style="white-space: pre-line;">Carregando a descrição completa do imóvel...</p>
         </div>
 
         <div class="col-md-4">
-            <div class="card shadow sticky-card border-0 p-4 rounded-4">
-                <h4 class="fw-bold mb-3">R$ <span id="detalhe-preco">0</span> <span class="fs-6 fw-normal text-muted">/ noite</span></h4>
+            <div class="card shadow border-0 p-4 sticky-card">
+                <h4 class="fw-bold text-danger mb-4">R$ <span id="imovel-preco">0,00</span> <span class="text-muted fs-6 fw-normal">/ noite</span></h4>
                 
                 <form id="form-reserva">
-                    <div class="row g-2 mb-3">
-                        <div class="col-6">
-                            <label class="small fw-bold">CHECK-IN</label>
-                            <input type="text" id="checkin" class="form-control" placeholder="Adicionar data" required autocomplete="off">
+                    <div class="row mb-3">
+                        <div class="col">
+                            <label class="form-label small fw-bold">Check-in</label>
+                            <input type="text" id="checkin" class="form-control" placeholder="AAAA-MM-DD" autocomplete="off" required>
                         </div>
-                        <div class="col-6">
-                            <label class="small fw-bold">CHECK-OUT</label>
-                            <input type="text" id="checkout" class="form-control" placeholder="Adicionar data" required autocomplete="off">
+                        <div class="col">
+                            <label class="form-label small fw-bold">Check-out</label>
+                            <input type="text" id="checkout" class="form-control" placeholder="AAAA-MM-DD" autocomplete="off" required>
                         </div>
                     </div>
 
-                    <div id="resumo-valores" class="d-none border-top pt-3">
+                    <div id="resumo-valores" class="d-none border-top pt-3 mb-3">
                         <div class="d-flex justify-content-between mb-2">
-                            <span id="label-multiplicador">R$ 0 x 0 noites</span>
-                            <span id="valor-subtotal">R$ 0</span>
+                            <span id="label-noites">R$ 0 x 0 noites</span>
+                            <span id="subtotal-noites">R$ 0,00</span>
                         </div>
-                        <div class="d-flex justify-content-between fw-bold fs-5 border-top pt-2">
+                        <div class="d-flex justify-content-between fw-bold border-top pt-2">
                             <span>Total</span>
-                            <span id="valor-total">R$ 0</span>
+                            <span id="total-reserva">R$ 0,00</span>
                         </div>
                     </div>
 
-                    <button type="submit" id="btn-reservar" class="btn btn-danger w-100 py-2 mt-3 fw-bold fs-5 rounded-3">Reservar</button>
+                    <button type="submit" id="btn-reservar" class="btn btn-danger w-100 fw-bold py-2 fs-5">Reservar Espaço</button>
                 </form>
+
+                <a id="btn-chat" href="#" class="btn btn-outline-primary w-100 fw-bold py-2 mt-2 d-none">
+                    <i class="bi bi-chat-left-text-fill"></i> Falar com o Anfitrião
+                </a>
             </div>
         </div>
     </div>
@@ -77,7 +87,6 @@
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
@@ -91,85 +100,113 @@
 
     let precoDiaria = 0;
     let usuarioLogadoId = null;
+    let donoId = null;
 
-    async function carregarImovel() {
-        if (!imovelId) { window.location.href = 'index.html'; return; }
-
-        const { data: imovel, error } = await supabase.from('imoveis').select('*').eq('id', imovelId).single();
-        if (error || !imovel) { alert('Imóvel não encontrado!'); window.location.href = 'index.html'; return; }
-
-        document.getElementById('detalhe-titulo').innerText = imovel.titulo;
-        document.getElementById('detalhe-cidade').innerText = imovel.cidade;
-        document.getElementById('detalhe-descricao').innerText = imovel.descricao;
-        document.getElementById('detalhe-preco').innerText = parseFloat(imovel.preco_diaria).toLocaleString('pt-BR', {minimumFractionDigits: 2});
-        precoDiaria = parseFloat(imovel.preco_diaria);
-
-        // Renderização inteligente das Múltiplas Imagens (Carrossel vs Imagem única)
-        const { data: fotos } = await supabase.from('imoveis_imagens').select('caminho_imagem').eq('imovel_id', imovelId);
-        const carouselContainer = document.getElementById('carousel-container');
-
-        if (fotos && fotos.length > 0) {
-            let carouselHtml = `
-                <div id="carouselImovel" class="carousel slide" data-bs-ride="carousel">
-                    <div class="carousel-inner">
-            `;
-            fotos.forEach((foto, index) => {
-                const urlCompleta = `${supabaseUrl}/storage/v1/object/public/imoveis-imagens/${foto.caminho_imagem}`;
-                carouselHtml += `
-                    <div class="carousel-item ${index === 0 ? 'active' : ''}">
-                        <img src="${urlCompleta}" class="imovel-img w-100" alt="Foto do imóvel">
-                    </div>
-                `;
-            });
-            carouselHtml += `
-                    </div>
-                    <button class="carousel-control-prev" type="button" data-bs-target="#carouselImovel" data-bs-slide="prev">
-                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                    </button>
-                    <button class="carousel-control-next" type="button" data-bs-target="#carouselImovel" data-bs-slide="next">
-                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                    </button>
-                </div>
-            `;
-            carouselContainer.innerHTML = carouselHtml;
-        } else if (imovel.imagem) {
-            const urlAntiga = `${supabaseUrl}/storage/v1/object/public/imoveis-imagens/${imovel.imagem}`;
-            carouselContainer.innerHTML = `<img src="${urlAntiga}" class="imovel-img w-100" alt="Foto do imóvel">`;
-        }
-
+    async function obterUsuarioLogado() {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-            usuarioLogadoId = user.id;
-            if (user.id === imovel.dono_id) {
-                document.getElementById('btn-reservar').disabled = true;
-                document.getElementById('btn-reservar').innerText = "Você é o proprietário";
+            // Busca o ID interno baseado no e-mail autenticado
+            const { data: usuario } = await supabase
+                .from('usuarios')
+                .select('id')
+                .eq('email', user.email)
+                .single();
+            
+            if (usuario) {
+                usuarioLogadoId = usuario.id;
             }
         }
     }
 
-    function calc() {
-        const entrada = new Date($("#checkin").val());
-        const saida = new Date($("#checkout").val());
-
-        if (entrada && saida && saida > entrada) {
-            const diff = Math.abs(saida - entrada);
-            const dias = Math.ceil(diff / (1000 * 60 * 60 * 24));
-            const total = dias * precoDiaria;
-
-            document.getElementById('label-multiplicador').innerText = `R$ ${precoDiaria.toLocaleString('pt-BR')} x ${dias} noites`;
-            document.getElementById('valor-subtotal').innerText = `R$ ${total.toLocaleString('pt-BR')}`;
-            document.getElementById('valor-total').innerText = `R$ ${total.toLocaleString('pt-BR')}`;
-            
-            document.getElementById('resumo-valores').classList.remove('d-none');
-            return { dias, total };
+    async function carregarDetalhes() {
+        if (!imovelId) {
+            alert('Imóvel não especificado.');
+            window.location.href = 'index.html';
+            return;
         }
-        document.getElementById('resumo-valores').classList.add('d-none');
-        return null;
+
+        const { data: imovel, error } = await supabase
+            .from('imoveis')
+            .select('*')
+            .eq('id', imovelId)
+            .single();
+
+        if (error || !imovel) {
+            console.error(error);
+            alert('Imóvel não encontrado.');
+            window.location.href = 'index.html';
+            return;
+        }
+
+        donoId = imovel.dono_id;
+        precoDiaria = parseFloat(imovel.preco_diaria);
+
+        // Preenche os dados básicos na tela
+        document.getElementById('imovel-titulo').innerText = imovel.titulo;
+        document.getElementById('imovel-cidade').innerText = imovel.cidade;
+        document.getElementById('imovel-descricao').innerText = imovel.descricao;
+        document.getElementById('imovel-preco').innerText = precoDiaria.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+        // Preenche dinamicamente as avaliações com base nas colunas ou valores padrão
+        const notaImovel = imovel.nota ? parseFloat(imovel.nota).toFixed(1) : '4.9';
+        const totalAvaliacoes = imovel.total_avaliacoes || '16';
+        document.getElementById('imovel-nota').innerText = notaImovel;
+        document.getElementById('imovel-avaliacoes').innerText = `(${totalAvaliacoes} avaliações)`;
+
+        if (imovel.imagem) {
+            document.getElementById('imovel-imagem').src = `${supabaseUrl}/storage/v1/object/public/imoveis-imagens/${imovel.imagem}`;
+        } else {
+            document.getElementById('imovel-imagem').src = 'https://via.placeholder.com/800x450?text=Sem+Imagem+Cadastrada';
+        }
+
+        // Habilita o botão do chat redirecionando para a conversa certa
+        if (usuarioLogadoId && usuarioLogadoId !== donoId) {
+            const btnChat = document.getElementById('btn-chat');
+            btnChat.href = `chat.html?imovel_id=${imovelId}&destinatario_id=${donoId}`;
+            btnChat.classList.remove('d-none');
+        }
     }
 
+    function calc() {
+        const checkinStr = $("#checkin").val();
+        const checkoutStr = $("#checkout").val();
+
+        if (!checkinStr || !checkoutStr) return null;
+
+        const d1 = new Date(checkinStr);
+        const d2 = new Date(checkoutStr);
+
+        const diffTime = d2 - d1;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays <= 0 || isNaN(diffDays)) {
+            document.getElementById('resumo-valores').classList.add('d-none');
+            return null;
+        }
+
+        const total = diffDays * precoDiaria;
+
+        document.getElementById('label-noites').innerText = `R$ ${precoDiaria.toLocaleString('pt-BR', {minimumFractionDigits: 2})} x ${diffDays} noites`;
+        document.getElementById('subtotal-noites').innerText = `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+        document.getElementById('total-reserva').innerText = `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+        document.getElementById('resumo-valores').classList.remove('d-none');
+
+        return { dias: diffDays, total: total };
+    }
+
+    // Inicialização do jQuery UI Datepicker
     $(function() {
-        $("#checkin").datepicker({ minDate: 0, dateFormat: 'yy-mm-dd', onSelect: function() { calc(); } }).on('change', function() { calc(); });
-        $("#checkout").datepicker({ minDate: 1, dateFormat: 'yy-mm-dd', onSelect: function() { calc(); } }).on('change', function() { calc(); });
+        $("#checkin").datepicker({ 
+            minDate: 0, 
+            dateFormat: 'yy-mm-dd', 
+            onSelect: function() { calc(); } 
+        }).on('change', function() { calc(); });
+
+        $("#checkout").datepicker({ 
+            minDate: 1, 
+            dateFormat: 'yy-mm-dd', 
+            onSelect: function() { calc(); } 
+        }).on('change', function() { calc(); });
     });
 
     document.getElementById('form-reserva').addEventListener('submit', async (e) => {
@@ -181,55 +218,31 @@
 
         const btn = document.getElementById('btn-reservar');
         btn.disabled = true;
-        btn.innerText = "Verificando...";
 
-        const checkinVal = $("#checkin").val();
-        const checkoutVal = $("#checkout").val();
+        const { error } = await supabase.from('reservas').insert([{\
+            imovel_id: imovelId,\
+            usuario_id: usuarioLogadoId,\
+            data_inicio: $("#checkin").val(),\
+            data_fim: $("#checkout").val(),\
+            dias: res.dias,\
+            valor_total: res.total,\
+            status: 'Confirmada',\
+            metodo_pagamento: 'Combinar'\
+        }]);
 
-        try {
-            // VALIDAÇÃO EXCLUSIVA DE CONFLITOS DE DIAS (Evita reservas duplicadas no mesmo dia)
-            const { data: conflitos, error: erroConflito } = await supabase
-                .from('reservas')
-                .select('id')
-                .eq('imovel_id', imovelId)
-                .neq('status', 'Cancelada')
-                .lt('data_inicio', checkoutVal)
-                .gt('data_fim', checkinVal);
-
-            if (erroConflito) throw erroConflito;
-
-            if (conflitos && conflitos.length > 0) {
-                alert("Não é possível realizar a reserva: este imóvel já está reservado nestas datas.");
-                btn.disabled = false;
-                btn.innerText = "Reservar";
-                return; // Bloqueia a inserção por completo!
-            }
-
-            // Criação da reserva preservada exatamente com o seu formato nativo
-            const { error } = await supabase.from('reservas').insert([{
-                imovel_id: imovelId,
-                usuario_id: usuarioLogadoId,
-                data_inicio: checkinVal,
-                data_fim: checkoutVal,
-                dias: res.dias,
-                valor_total: res.total,
-                status: 'Confirmada',
-                metodo_pagamento: 'Combinar'
-            }]);
-
-            if (error) throw error;
-
-            alert("Reserva realizada com sucesso!");
-            window.location.href = 'minhas_viagens.html';
-
-        } catch (err) {
-            alert("Erro: " + err.message);
+        if (error) { 
+            alert("Erro ao realizar reserva: " + error.message);
             btn.disabled = false;
-            btn.innerText = "Reservar";
+        } else {
+            alert("Reserva confirmada com sucesso!");
+            window.location.href = 'minhas_viagens.html';
         }
     });
 
-    carregarImovel();
+    (async () => {
+        await obterUsuarioLogado();
+        await carregarDetalhes();
+    })();
 </script>
 </body>
 </html>
