@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Detalhes do Imóvel - Home Sweet Home</title>
-    
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
-    
+
     <style>
         #ui-datepicker-div { z-index: 9999 !important; }
         .ui-datepicker { background: #fff; border: 1px solid #ddd; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; padding: 10px; }
@@ -21,181 +21,86 @@
 <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
     <div class="container">
         <a class="navbar-brand text-danger fw-bold" href="index.html">Home Sweet Home</a>
-        <a href="index.html" class="btn btn-outline-dark btn-sm">Voltar</a>
+        <a href="index.html" class="btn btn-outline-dark btn-sm">Voltar ao Início</a>
     </div>
 </nav>
 
-<div class="container mt-5 mb-5">
-    <div class="row">
+<div class="container mt-4 mb-5">
+    <div id="loader" class="text-center py-5">
+        <div class="spinner-border text-danger" role="status"></div>
+        <p class="mt-2 text-muted">Carregando detalhes do lar...</p>
+    </div>
+
+    <div id="main-content" class="row d-none">
+
         <div class="col-md-8">
-            <h1 class="fw-bold mb-1" id="imovel-titulo">Buscando imóvel...</h1>
-            
-            <div class="d-flex align-items-center mb-4 small">
-                <span class="me-3">
-                    <i class="bi bi-star-fill text-warning"></i> 
-                    <strong id="imovel-nota">4.9</strong> 
-                    <span class="text-muted" id="imovel-avaliacoes">(16 avaliações)</span>
-                </span>
-                <span class="text-muted">
-                    <i class="bi bi-geo-alt-fill"></i> <span id="imovel-cidade">...</span>
-                </span>
+            <img id="imovel-img" src="" class="img-fluid w-100 imovel-img mb-4" alt="Imóvel">
+
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h1 id="imovel-titulo" class="fw-bold mb-1"></h1>
+                    <p id="imovel-cidade" class="text-muted fs-5"></p>
+                </div>
+                <div id="chat-btn-area"></div>
             </div>
 
-            <img id="imovel-imagem" src="https://via.placeholder.com/800x450?text=Carregando+Imagem..." class="img-fluid w-100 imovel-img mb-4" alt="Imagem do Imóvel">
-            
-            <h3 class="fw-bold mb-3">O que este lugar oferece</h3>
-            <p id="imovel-descricao" class="text-muted" style="white-space: pre-line;">Carregando a descrição completa do imóvel...</p>
+            <hr>
+            <h4 class="fw-bold">Sobre este espaço</h4>
+            <p id="imovel-descricao" style="white-space: pre-wrap;" class="text-secondary"></p>
+            <hr>
+
+            <div class="mt-4">
+                <h4 class="fw-bold">Avaliações (<span id="total-avaliacoes">0</span>) - ⭐ <span id="media-nota">0.0</span></h4>
+                <div id="area-minha-avaliacao" class="d-none border p-3 rounded mb-4 bg-white shadow-sm">
+                    <h6 class="fw-bold mb-3">O que você achou da sua estadia?</h6>
+                    <form id="form-avaliacao">
+                        <div class="row g-2">
+                            <div class="col-md-3">
+                                <select id="nota" class="form-select" required>
+                                    <option value="5">5 - Excelente</option>
+                                    <option value="4">4 - Muito Bom</option>
+                                    <option value="3">3 - Bom</option>
+                                    <option value="2">2 - Regular</option>
+                                    <option value="1">1 - Ruim</option>
+                                </select>
+                            </div>
+                            <div class="col-md-9">
+                                <textarea id="comentario" class="form-control" placeholder="Escreva um comentário (opcional)..." rows="1"></textarea>
+                            </div>
+                        </div>
+                        <button type="submit" id="btn-enviar-av" class="btn btn-dark btn-sm mt-2">Enviar Avaliação</button>
+                    </form>
+                </div>
+                <div id="lista-avaliacoes" class="list-group list-group-flush mt-3"></div>
+            </div>
         </div>
 
         <div class="col-md-4">
             <div class="card shadow border-0 p-4 sticky-card">
-                <h4 class="fw-bold text-danger mb-4">R$ <span id="imovel-preco">0,00</span> <span class="text-muted fs-6 fw-normal">/ noite</span></h4>
-                
+                <h3 class="fw-bold text-danger">R$ <span id="imovel-preco">0,00</span> <span class="fs-6 text-muted fw-normal">/ noite</span></h3>
+                <hr>
+                <div id="msg-reserva"></div>
                 <form id="form-reserva">
-                    <div class="row mb-3">
-                        <div class="col">
-                            <label class="form-label small fw-bold">Check-in</label>
-                            <input type="text" id="checkin" class="form-control" placeholder="AAAA-MM-DD" autocomplete="off" required>
-                        </div>
-                        <div class="col">
-                            <label class="form-label small fw-bold">Check-out</label>
-                            <input type="text" id="checkout" class="form-control" placeholder="AAAA-MM-DD" autocomplete="off" required>
-                        </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-uppercase text-muted">Check-in</label>
+                        <input type="text" id="checkin" class="form-control" placeholder="Selecione" readonly required>
+                        <input type="text" id="checkin" class="form-control" placeholder="AAAA-MM-DD" required>
                     </div>
-
-                    <div id="resumo-valores" class="d-none border-top pt-3 mb-3">
-                        <div class="d-flex justify-content-between mb-2">
-                            <span id="label-noites">R$ 0 x 0 noites</span>
-                            <span id="subtotal-noites">R$ 0,00</span>
-                        </div>
-                        <div class="d-flex justify-content-between fw-bold border-top pt-2">
-                            <span>Total</span>
-                            <span id="total-reserva">R$ 0,00</span>
-                        </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-uppercase text-muted">Check-out</label>
+                        <input type="text" id="checkout" class="form-control" placeholder="Selecione" readonly required>
+                        <input type="text" id="checkout" class="form-control" placeholder="AAAA-MM-DD" required>
                     </div>
-
-                    <button type="submit" id="btn-reservar" class="btn btn-danger w-100 fw-bold py-2 fs-5">Reservar Espaço</button>
-                </form>
-
-                <a id="btn-chat" href="#" class="btn btn-outline-primary w-100 fw-bold py-2 mt-2 d-none">
-                    <i class="bi bi-chat-left-text-fill"></i> Falar com o Anfitrião
-                </a>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
-
-<script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
-
-    const supabaseUrl = 'https://drlnbbodugxkndtpomfa.supabase.co'
-    const supabaseKey = 'sb_publishable_uxQbUyjsM-DgKapQzvE32Q_ZUNBtdp1'
-    const supabase = createClient(supabaseUrl, supabaseKey)
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const imovelId = urlParams.get('id');
-
-    let precoDiaria = 0;
-    let usuarioLogadoId = null;
-    let donoId = null;
-
-    async function obterUsuarioLogado() {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-            // Busca o ID interno baseado no e-mail autenticado
-            const { data: usuario } = await supabase
-                .from('usuarios')
-                .select('id')
-                .eq('email', user.email)
-                .single();
-            
-            if (usuario) {
-                usuarioLogadoId = usuario.id;
-            }
-        }
+                    <div class="d-flex justify-content-between mt-4 p-2 bg-light rounded">
+                        <span class="fw-bold">Total estimado:</span>
+@@ -175,9 +175,19 @@
+        return null;
     }
 
-    async function carregarDetalhes() {
-        if (!imovelId) {
-            alert('Imóvel não especificado.');
-            window.location.href = 'index.html';
-            return;
-        }
-
-        const { data: imovel, error } = await supabase
-            .from('imoveis')
-            .select('*')
-            .eq('id', imovelId)
-            .single();
-
-        if (error || !imovel) {
-            console.error(error);
-            alert('Imóvel não encontrado.');
-            window.location.href = 'index.html';
-            return;
-        }
-
-        donoId = imovel.dono_id;
-        precoDiaria = parseFloat(imovel.preco_diaria);
-
-        // Preenche os dados básicos na tela
-        document.getElementById('imovel-titulo').innerText = imovel.titulo;
-        document.getElementById('imovel-cidade').innerText = imovel.cidade;
-        document.getElementById('imovel-descricao').innerText = imovel.descricao;
-        document.getElementById('imovel-preco').innerText = precoDiaria.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-
-        // Preenche dinamicamente as avaliações com base nas colunas ou valores padrão
-        const notaImovel = imovel.nota ? parseFloat(imovel.nota).toFixed(1) : '4.9';
-        const totalAvaliacoes = imovel.total_avaliacoes || '16';
-        document.getElementById('imovel-nota').innerText = notaImovel;
-        document.getElementById('imovel-avaliacoes').innerText = `(${totalAvaliacoes} avaliações)`;
-
-        if (imovel.imagem) {
-            document.getElementById('imovel-imagem').src = `${supabaseUrl}/storage/v1/object/public/imoveis-imagens/${imovel.imagem}`;
-        } else {
-            document.getElementById('imovel-imagem').src = 'https://via.placeholder.com/800x450?text=Sem+Imagem+Cadastrada';
-        }
-
-        // Habilita o botão do chat redirecionando para a conversa certa
-        if (usuarioLogadoId && usuarioLogadoId !== donoId) {
-            const btnChat = document.getElementById('btn-chat');
-            btnChat.href = `chat.html?imovel_id=${imovelId}&destinatario_id=${donoId}`;
-            btnChat.classList.remove('d-none');
-        }
-    }
-
-    function calc() {
-        const checkinStr = $("#checkin").val();
-        const checkoutStr = $("#checkout").val();
-
-        if (!checkinStr || !checkoutStr) return null;
-
-        const d1 = new Date(checkinStr);
-        const d2 = new Date(checkoutStr);
-
-        const diffTime = d2 - d1;
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        if (diffDays <= 0 || isNaN(diffDays)) {
-            document.getElementById('resumo-valores').classList.add('d-none');
-            return null;
-        }
-
-        const total = diffDays * precoDiaria;
-
-        document.getElementById('label-noites').innerText = `R$ ${precoDiaria.toLocaleString('pt-BR', {minimumFractionDigits: 2})} x ${diffDays} noites`;
-        document.getElementById('subtotal-noites').innerText = `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-        document.getElementById('total-reserva').innerText = `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-        document.getElementById('resumo-valores').classList.remove('d-none');
-
-        return { dias: diffDays, total: total };
-    }
-
-    // Inicialização do jQuery UI Datepicker
+    // Configuração do calendário atualizada para aceitar digitação
     $(function() {
+        $("#checkin").datepicker({ minDate: 0, dateFormat: 'yy-mm-dd', onSelect: function() { calc(); } });
+        $("#checkout").datepicker({ minDate: 1, dateFormat: 'yy-mm-dd', onSelect: function() { calc(); } });
         $("#checkin").datepicker({ 
             minDate: 0, 
             dateFormat: 'yy-mm-dd', 
@@ -210,39 +115,33 @@
     });
 
     document.getElementById('form-reserva').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        if (!usuarioLogadoId) { window.location.href = 'login.html'; return; }
-
-        const res = calc();
-        if (!res) { alert("Datas inválidas"); return; }
-
+@@ -190,13 +200,12 @@
         const btn = document.getElementById('btn-reservar');
         btn.disabled = true;
 
-        const { error } = await supabase.from('reservas').insert([{\
-            imovel_id: imovelId,\
-            usuario_id: usuarioLogadoId,\
-            data_inicio: $("#checkin").val(),\
-            data_fim: $("#checkout").val(),\
-            dias: res.dias,\
-            valor_total: res.total,\
-            status: 'Confirmada',\
-            metodo_pagamento: 'Combinar'\
-        }]);
+        // CORREÇÃO: Enviando o campo 'dias' que o seu banco exige
+        const { error } = await supabase.from('reservas').insert([{
+            imovel_id: imovelId,
+            usuario_id: usuarioLogadoId,
+            data_inicio: $("#checkin").val(),
+            data_fim: $("#checkout").val(),
+            dias: res.dias, // AGORA O CAMPO DIAS ESTÁ AQUI
+            dias: res.dias,
+            valor_total: res.total,
+            status: 'Confirmada',
+            metodo_pagamento: 'Combinar'
+                         }]);
 
         if (error) { 
-            alert("Erro ao realizar reserva: " + error.message);
-            btn.disabled = false;
-        } else {
-            alert("Reserva confirmada com sucesso!");
-            window.location.href = 'minhas_viagens.html';
+            alert("Erro: " + error.message); 
+            btn.disabled = false; 
+        } else { 
+            alert("Reserva feita!");
+            window.location.href = 'minhas_viagens.html'; 
         }
     });
 
-    (async () => {
-        await obterUsuarioLogado();
-        await carregarDetalhes();
-    })();
+    init();
 </script>
 </body>
 </html>
