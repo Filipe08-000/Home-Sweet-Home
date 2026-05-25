@@ -26,30 +26,27 @@
                 <form id="form-anuncio">
                     <div class="mb-3">
                         <label class="form-label fw-bold">Título do Anúncio</label>
-                        <input type="text" id="titulo" class="form-control" placeholder="Ex: Casa aconchegante na praia" required>
+                        <input type="text" id="titulo" class="form-control" required>
                     </div>
-
                     <div class="mb-3">
                         <label class="form-label fw-bold">Cidade</label>
-                        <input type="text" id="cidade" class="form-control" placeholder="Ex: Rio de Janeiro" required>
+                        <input type="text" id="cidade" class="form-control" required>
                     </div>
-
                     <div class="mb-3">
                         <label class="form-label fw-bold">Descrição completa</label>
-                        <textarea id="descricao" class="form-control" rows="4" placeholder="Conte mais sobre o espaço..." required></textarea>
+                        <textarea id="descricao" class="form-control" rows="4" required></textarea>
                     </div>
-
                     <div class="mb-3">
                         <label class="form-label fw-bold">Preço da Diária (R$)</label>
-                        <input type="number" id="preco" class="form-control" placeholder="0.00" step="0.01" required>
+                        <input type="number" id="preco" class="form-control" required>
                     </div>
-
                     <div class="mb-4">
-                        <label class="form-label fw-bold">Foto do Imóvel</label>
-                        <input type="file" id="foto" class="form-control" accept="image/*" required>
+                        <label class="form-label fw-bold">Fotos do Imóvel (Selecione uma ou mais)</label>
+                        <input type="file" id="foto" class="form-control" accept="image/*" multiple required>
+                        <small class="text-muted">Dica: Segure Ctrl (ou Cmd no Mac) para selecionar várias fotos de uma vez.</small>
                     </div>
 
-                    <button type="submit" id="btn-cadastrar" class="btn btn-success w-100 py-2 fs-5 fw-bold">Cadastrar Imóvel</button>
+                    <button type="submit" id="btn-cadastrar" class="btn btn-danger w-100 py-2 fs-5 fw-bold">Cadastrar Imóvel</button>
                 </form>
             </div>
         </div>
@@ -68,31 +65,24 @@
         
         const btn = document.getElementById('btn-cadastrar');
         const msgDiv = document.getElementById('msg-status');
-        
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        const files = document.getElementById('foto').files;
 
-        if (authError || !user) {
-            msgDiv.innerHTML = `<div class="alert alert-danger">Você precisa estar logado para anunciar.</div>`;
-            window.location.href = 'login.html';
+        if (files.length === 0) {
+            msgDiv.innerHTML = `<div class="alert alert-danger">Por favor, selecione pelo menos uma foto.</div>`;
             return;
         }
 
         btn.disabled = true;
-        btn.innerText = "Enviando...";
+        btn.innerText = "Enviando informações e fotos...";
 
         try {
-            const fotoFile = document.getElementById('foto').files[0];
-            const nomeArquivo = `${Date.now()}_${fotoFile.name}`;
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Você precisa estar logado para anunciar.");
 
-            // 1. Upload da imagem original
-            const { error: imgError } = await supabase.storage
-                .from('imoveis-imagens')
-                .upload(nomeArquivo, fotoFile);
+            // Usamos a primeira foto do array como a imagem de capa principal (para a index)
+            const primeiraFotoNome = `${Date.now()}_0_${files[0].name}`;
 
-            if (imgError) throw imgError;
-
-            // 2. Cadastro do imóvel no banco
-            // IMPORTANTE: aqui pedimos o ID de volta
+            // 1. Inserir dados do imóvel na tabela principal
             const { data: imovel, error: dbError } = await supabase
                 .from('imoveis')
                 .insert([{
@@ -100,26 +90,33 @@
                     cidade: document.getElementById('cidade').value,
                     descricao: document.getElementById('descricao').value,
                     preco_diaria: parseFloat(document.getElementById('preco').value),
-                    imagem: nomeArquivo,
+                    imagem: primeiraFotoNome, 
                     dono_id: user.id,
-                    status_processamento_imagem: 'pendente'
+                    status_processamento_imagem: 'processado'
                 }])
                 .select('id')
                 .single();
 
             if (dbError) throw dbError;
 
-            // 3. Enfileirar job de processamento da imagem
-            const { error: jobError } = await supabase
-                .from('jobs_imagem')
-                .insert([{
+            // 2. Loop para fazer upload de cada foto e vincular ao imóvel cadastrado
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const nomeArquivo = `${Date.now()}_${i}_${file.name}`;
+
+                // Upload para o Bucket de imagens do Supabase
+                const { error: imgError } = await supabase.storage.from('imoveis-imagens').upload(nomeArquivo, file);
+                if (imgError) throw imgError;
+
+                // Salva a relação na nossa nova tabela auxiliar de imagens
+                const { error: relError } = await supabase.from('imoveis_imagens').insert([{
                     imovel_id: imovel.id,
-                    caminho_original: nomeArquivo
+                    caminho_imagem: nomeArquivo
                 }]);
+                if (relError) throw relError;
+            }
 
-            if (jobError) throw jobError;
-
-            msgDiv.innerHTML = `<div class="alert alert-success">Imóvel cadastrado com sucesso! Imagem enviada para processamento.</div>`;
+            msgDiv.innerHTML = `<div class="alert alert-success">Imóvel cadastrado com sucesso com ${files.length} fotos!</div>`;
             setTimeout(() => window.location.href = 'index.html', 2000);
 
         } catch (erro) {
