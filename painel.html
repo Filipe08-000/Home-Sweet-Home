@@ -12,6 +12,7 @@
     <div class="container">
         <a class="navbar-brand text-danger fw-bold" href="index.html">Home Sweet Home</a>
         <div>
+            <a href="inbox.html" class="btn btn-outline-primary me-2">Mensagens</a>
             <a href="cadastrar_imovel.html" class="btn btn-success me-2">Novo Anúncio</a>
             <a href="index.html" class="btn btn-outline-dark">Voltar</a>
         </div>
@@ -48,29 +49,18 @@
     const supabaseKey = 'sb_publishable_uxQbUyjsM-DgKapQzvE32Q_ZUNBtdp1'
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    let usuarioLogadoId = null;
-
     async function carregarPainel() {
         const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-            window.location.href = 'login.html';
-            return;
-        }
+        if (!user) { window.location.href = 'login.html'; return; }
 
-        // Pega o ID do usuário na tabela pública
-        const { data: usuarioDb } = await supabase.from('usuarios').select('id').eq('email', user.email).single();
-        usuarioLogadoId = usuarioDb.id;
-
-        // Busca SÓ os imóveis deste usuário
         const { data: imoveis, error } = await supabase
             .from('imoveis')
             .select('*')
-            .eq('dono_id', usuarioLogadoId)
+            .eq('dono_id', user.id)
             .order('id', { ascending: false });
 
         const tbody = document.getElementById('tabela-imoveis');
-        tbody.innerHTML = ''; // Limpa o "Buscando..."
+        tbody.innerHTML = ''; 
 
         if (error || imoveis.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Você ainda não tem imóveis cadastrados.</td></tr>';
@@ -87,30 +77,22 @@
                 <td>${imovel.cidade}</td>
                 <td>R$ ${parseFloat(imovel.preco_diaria).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                 <td>
+                    <a href="editar_imovel.html?id=${imovel.id}" class="btn btn-sm btn-primary">Editar</a>
                     <button class="btn btn-sm btn-danger btn-excluir" data-id="${imovel.id}">Excluir</button>
                 </td>
             `;
             tbody.appendChild(tr);
         });
 
-        // Adiciona a ação de deletar em todos os botões "Excluir"
         document.querySelectorAll('.btn-excluir').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const idParaExcluir = e.target.getAttribute('data-id');
                 if (confirm('Tem certeza que deseja excluir este imóvel?')) {
                     e.target.innerText = "Excluindo...";
                     e.target.disabled = true;
-
-                    // Deleta do banco
                     const { error } = await supabase.from('imoveis').delete().eq('id', idParaExcluir);
-                    
-                    if (!error) {
-                        e.target.closest('tr').remove(); // Some com a linha na hora!
-                    } else {
-                        alert('Erro ao excluir: ' + error.message);
-                        e.target.innerText = "Excluir";
-                        e.target.disabled = false;
-                    }
+                    if (!error) e.target.closest('tr').remove(); 
+                    else alert('Erro ao excluir: ' + error.message);
                 }
             });
         });
