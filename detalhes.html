@@ -12,7 +12,7 @@
     <style>
         #ui-datepicker-div { z-index: 9999 !important; }
         .ui-datepicker { background: #fff; border: 1px solid #ddd; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; padding: 10px; }
-        .imovel-img { height: 450px; object-fit: cover; border-radius: 12px; width: 100%; }
+        .imovel-img { height: 450px; object-fit: cover; border-radius: 12px; }
         .sticky-card { position: sticky; top: 20px; }
     </style>
 </head>
@@ -38,9 +38,7 @@
     <div class="row mt-4">
         <div class="col-md-8">
             <h3 class="fw-bold border-bottom pb-3">Sobre este espaço</h3>
-            <p id="detalhe-descricao" class="fs-5 text-secondary style-text" style="white-space: pre-line;">
-                Carregando descrição...
-            </p>
+            <p id="detalhe-descricao" class="fs-5 text-secondary" style="white-space: pre-line;">Carregando descrição...</p>
         </div>
 
         <div class="col-md-4">
@@ -72,11 +70,6 @@
 
                     <button type="submit" id="btn-reservar" class="btn btn-danger w-100 py-2 mt-3 fw-bold fs-5 rounded-3">Reservar</button>
                 </form>
-
-                <div id="container-chat" class="d-none border-top pt-3 mt-3 text-center">
-                    <p class="small text-muted mb-2">Tem dúvidas sobre o local?</p>
-                    <a id="btn-falar-anfitriao" class="btn btn-outline-primary w-100 fw-bold"><i class="bi bi-chat-dots"></i> Falar com Anfitrião</a>
-                </div>
             </div>
         </div>
     </div>
@@ -98,7 +91,6 @@
 
     let precoDiaria = 0;
     let usuarioLogadoId = null;
-    let donoId = null;
 
     async function carregarImovel() {
         if (!imovelId) { window.location.href = 'index.html'; return; }
@@ -106,15 +98,13 @@
         const { data: imovel, error } = await supabase.from('imoveis').select('*').eq('id', imovelId).single();
         if (error || !imovel) { alert('Imóvel não encontrado!'); window.location.href = 'index.html'; return; }
 
-        // Preenche os dados de texto
         document.getElementById('detalhe-titulo').innerText = imovel.titulo;
         document.getElementById('detalhe-cidade').innerText = imovel.cidade;
         document.getElementById('detalhe-descricao').innerText = imovel.descricao;
         document.getElementById('detalhe-preco').innerText = parseFloat(imovel.preco_diaria).toLocaleString('pt-BR', {minimumFractionDigits: 2});
         precoDiaria = parseFloat(imovel.preco_diaria);
-        donoId = imovel.dono_id;
 
-        // BUSCA AS MÚLTIPLAS FOTOS DO IMÓVEL
+        // Renderização inteligente das Múltiplas Imagens (Carrossel vs Imagem única)
         const { data: fotos } = await supabase.from('imoveis_imagens').select('caminho_imagem').eq('imovel_id', imovelId);
         const carouselContainer = document.getElementById('carousel-container');
 
@@ -123,16 +113,14 @@
                 <div id="carouselImovel" class="carousel slide" data-bs-ride="carousel">
                     <div class="carousel-inner">
             `;
-            
             fotos.forEach((foto, index) => {
                 const urlCompleta = `${supabaseUrl}/storage/v1/object/public/imoveis-imagens/${foto.caminho_imagem}`;
                 carouselHtml += `
                     <div class="carousel-item ${index === 0 ? 'active' : ''}">
-                        <img src="${urlCompleta}" class="imovel-img" alt="Foto do imóvel">
+                        <img src="${urlCompleta}" class="imovel-img w-100" alt="Foto do imóvel">
                     </div>
                 `;
             });
-
             carouselHtml += `
                     </div>
                     <button class="carousel-control-prev" type="button" data-bs-target="#carouselImovel" data-bs-slide="prev">
@@ -144,134 +132,98 @@
                 </div>
             `;
             carouselContainer.innerHTML = carouselHtml;
-        } else {
-            // Fallback caso o imóvel antigo não tenha fotos na tabela nova
+        } else if (imovel.imagem) {
             const urlAntiga = `${supabaseUrl}/storage/v1/object/public/imoveis-imagens/${imovel.imagem}`;
-            carouselContainer.innerHTML = `<img src="${urlAntiga}" class="imovel-img" alt="Foto do imóvel">`;
+            carouselContainer.innerHTML = `<img src="${urlAntiga}" class="imovel-img w-100" alt="Foto do imóvel">`;
         }
 
-        // Verifica autenticação
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
             usuarioLogadoId = user.id;
-            
-            // Se for o dono do imóvel, esconde botões de reserva/chat para ele não reservar o próprio lugar
             if (user.id === imovel.dono_id) {
                 document.getElementById('btn-reservar').disabled = true;
                 document.getElementById('btn-reservar').innerText = "Você é o proprietário";
-            } else {
-                document.getElementById('container-chat').classList.remove('d-none');
-                
-                // Pega o ID numérico do dono para abrir o chat
-                const { data: donoDb } = await supabase.from('usuarios').select('id').eq('email', user.email).single(); // (ajustar busca caso use emails diferentes, o ideal é linkar com o dono correto)
-                
-                // Busca simplificada do ID interno do dono do imóvel para o link do chat funcionar
-                const { data: tabelaDono } = await supabase.from('imoveis').select('usuarios(id)').eq('id', imovelId).single();
-                
-                document.getElementById('btn-falar-anfitriao').addEventListener('click', async () => {
-                    const { data: euDb } = await supabase.from('usuarios').select('id').eq('email', user.email).single();
-                    // Busca quem é o dono na tabela de usuários públicos
-                    const { data: imovelComDono } = await supabase.from('imoveis').select('dono_id').eq('id', imovelId).single();
-                    const { data: donoPublico } = await supabase.from('usuarios').select('id').eq('email', user.email).single(); // ideal buscar por uuid se sincronizado, ou fazer join.
-                    
-                    // Redireciona para o chat com o dono do anúncio
-                    window.location.href = `chat.html?imovel_id=${imovelId}&destinatario_id=${tabelaDono?.usuarios?.id || 1}`;
-                });
             }
         }
     }
 
-    // Configuração dos seletores de datas (Datepicker)
-    $(function() {
-        $("#checkin").datepicker({ 
-            minDate: 0, 
-            dateFormat: 'yy-mm-dd', 
-            onSelect: function() { calcularValores(); } 
-        });
-
-        $("#checkout").datepicker({ 
-            minDate: 1, 
-            dateFormat: 'yy-mm-dd', 
-            onSelect: function() { calcularValores(); } 
-        });
-    });
-
-    function calcularValores() {
+    function calc() {
         const entrada = new Date($("#checkin").val());
         const saida = new Date($("#checkout").val());
 
         if (entrada && saida && saida > entrada) {
-            const diferencaTempo = Math.abs(saida - entrada);
-            const totalDias = Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24));
+            const diff = Math.abs(saida - entrada);
+            const dias = Math.ceil(diff / (1000 * 60 * 60 * 24));
+            const total = dias * precoDiaria;
 
-            const totalPagar = totalDias * precoDiaria;
-
-            document.getElementById('label-multiplicador').innerText = `R$ ${precoDiaria.toLocaleString('pt-BR')} x ${totalDias} noites`;
-            document.getElementById('valor-subtotal').innerText = `R$ ${totalPagar.toLocaleString('pt-BR')}`;
-            document.getElementById('valor-total').innerText = `R$ ${totalPagar.toLocaleString('pt-BR')}`;
+            document.getElementById('label-multiplicador').innerText = `R$ ${precoDiaria.toLocaleString('pt-BR')} x ${dias} noites`;
+            document.getElementById('valor-subtotal').innerText = `R$ ${total.toLocaleString('pt-BR')}`;
+            document.getElementById('valor-total').innerText = `R$ ${total.toLocaleString('pt-BR')}`;
             
             document.getElementById('resumo-valores').classList.remove('d-none');
-            return { dias: totalDias, total: totalPagar };
+            return { dias, total };
         }
         document.getElementById('resumo-valores').classList.add('d-none');
         return null;
     }
 
-    // DISPARO DA RESERVA + VALIDAÇÃO DE CONFLITO DE DATAS
+    $(function() {
+        $("#checkin").datepicker({ minDate: 0, dateFormat: 'yy-mm-dd', onSelect: function() { calc(); } }).on('change', function() { calc(); });
+        $("#checkout").datepicker({ minDate: 1, dateFormat: 'yy-mm-dd', onSelect: function() { calc(); } }).on('change', function() { calc(); });
+    });
+
     document.getElementById('form-reserva').addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!usuarioLogadoId) { window.location.href = 'login.html'; return; }
 
-        const calculo = calcularValores();
-        if (!calculo) { alert("Por favor, selecione datas válidas de entrada e saída."); return; }
+        const res = calc();
+        if (!res) { alert("Datas inválidas"); return; }
 
         const btn = document.getElementById('btn-reservar');
         btn.disabled = true;
-        btn.innerText = "Verificando disponibilidade...";
+        btn.innerText = "Verificando...";
 
-        const dataInicio = $("#checkin").val();
-        const dataFim = $("#checkout").val();
+        const checkinVal = $("#checkin").val();
+        const checkoutVal = $("#checkout").val();
 
         try {
-            // VALIDAÇÃO EXCLUSIVA: Procura reservas conflitantes ativas para este imóvel
-            // Um conflito acontece se (ReservaExistente.data_inicio <= NovaReserva.data_fim) E (ReservaExistente.data_fim >= NovaReserva.data_inicio)
-            const { data: conflitos, error: erroBusca } = await supabase
+            // VALIDAÇÃO EXCLUSIVA DE CONFLITOS DE DIAS (Evita reservas duplicadas no mesmo dia)
+            const { data: conflitos, error: erroConflito } = await supabase
                 .from('reservas')
                 .select('id')
                 .eq('imovel_id', imovelId)
                 .neq('status', 'Cancelada')
-                .lte('data_inicio', dataFim)
-                .gte('data_fim', dataInicio);
+                .lt('data_inicio', checkoutVal)
+                .gt('data_fim', checkinVal);
 
-            if (erroBusca) throw erroBusca;
+            if (erroConflito) throw erroConflito;
 
             if (conflitos && conflitos.length > 0) {
-                alert("⚠️ Calendário Ocupado! Este imóvel já possui uma reserva confirmada para este período ou parte dele. Escolha outras datas.");
+                alert("Não é possível realizar a reserva: este imóvel já está reservado nestas datas.");
                 btn.disabled = false;
                 btn.innerText = "Reservar";
-                return; // Bloqueia a criação da reserva!
+                return; // Bloqueia a inserção por completo!
             }
 
-            // Se passou na verificação, cria a reserva normalmente
-            btn.innerText = "Confirmando reserva...";
-            const { error: insError } = await supabase.from('reservas').insert([{\
-                imovel_id: imovelId,\
-                usuario_id: usuarioLogadoId,\
-                data_inicio: dataInicio,\
-                data_fim: dataFim,\
-                dias: calculo.dias,\
-                valor_total: calculo.total,\
-                status: 'Confirmada',\
-                metodo_pagamento: 'Combinar'\
+            // Criação da reserva preservada exatamente com o seu formato nativo
+            const { error } = await supabase.from('reservas').insert([{
+                imovel_id: imovelId,
+                usuario_id: usuarioLogadoId,
+                data_inicio: checkinVal,
+                data_fim: checkoutVal,
+                dias: res.dias,
+                valor_total: res.total,
+                status: 'Confirmada',
+                metodo_pagamento: 'Combinar'
             }]);
 
-            if (insError) throw insError;
+            if (error) throw error;
 
-            alert("🎉 Reserva realizada com sucesso! Boa viagem!");
-            window.location.href = "minhas_viagens.html";
+            alert("Reserva realizada com sucesso!");
+            window.location.href = 'minhas_viagens.html';
 
         } catch (err) {
-            alert("Erro ao processar reserva: " + err.message);
+            alert("Erro: " + err.message);
             btn.disabled = false;
             btn.innerText = "Reservar";
         }
