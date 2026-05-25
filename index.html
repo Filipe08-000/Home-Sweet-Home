@@ -21,105 +21,68 @@
             </div>
 
             <div id="user-menu" class="d-none">
-    <a href="inbox.html" class="btn btn-outline-primary me-2">
-        <i class="bi bi-chat-left-text-fill"></i> Mensagens
-    </a>
-    <a href="minhas_reservas.html" class="btn btn-outline-dark me-2">Hóspedes</a>
-    <a href="minhas_viagens.html" class="btn btn-outline-dark me-2">Minhas Viagens</a>
-    <a href="painel.html" class="btn btn-dark me-2">Painel Anfitrião</a>
-    <button id="btn-sair" class="btn btn-danger">Sair</button>
-</div>
+                <span id="user-name" class="me-3 fw-bold text-secondary">Olá, ...</span>
+                
+                <a href="inbox.html" class="btn btn-outline-primary me-2">
+                    <i class="bi bi-chat-left-text-fill"></i> Mensagens
+                </a>
+
+                <a href="minhas_reservas.html" class="btn btn-outline-dark me-2 d-none d-md-inline-block">Hóspedes</a>
+                <a href="minhas_viagens.html" class="btn btn-outline-dark me-2">Minhas Viagens</a>
+                <a href="painel.html" class="btn btn-dark me-2">Painel Anfitrião</a>
+                <button id="btn-sair" class="btn btn-danger">Sair</button>
+            </div>
         </div>
     </div>
 </nav>
 
-<div class="hero text-center bg-danger text-white py-5 mb-4">
-    <div class="container">
-        <h1 class="display-4 fw-bold">Home Sweet Home</h1>
-        <p class="lead">Encontre o lugar perfeito para sua próxima estadia.</p>
-    </div>
-</div>
-
-<div class="container mb-5">
-    <div class="row" id="imoveis-container">
-        <div class="col-12 text-center mt-5" id="loading-message">
-            <div class="spinner-border text-danger" role="status">
-                <span class="visually-hidden">Carregando...</span>
-            </div>
-            <p class="text-muted mt-2">Buscando imóveis incríveis...</p>
+<div class="container mt-5">
+    <div class="row" id="lista-imoveis">
         </div>
-    </div>
 </div>
-
-<footer class="bg-white border-top text-center text-lg-start mt-5">
-    <div class="text-center p-3 text-muted">
-        © <span id="ano-atual"></span> Home Sweet Home
-    </div>
-</footer>
 
 <script type="module">
-    // 1. Importa a biblioteca do Supabase direto no navegador
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
-    // 2. Configura a conexão (COLOQUE SUAS CHAVES AQUI)
     const supabaseUrl = 'https://drlnbbodugxkndtpomfa.supabase.co'
     const supabaseKey = 'sb_publishable_uxQbUyjsM-DgKapQzvE32Q_ZUNBtdp1'
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Coloca o ano atual no rodapé (substituindo o date("Y") do PHP)
-    document.getElementById('ano-atual').innerText = new Date().getFullYear();
-
-    // 3. Função para verificar se o usuário está logado e mudar o Cabeçalho
-    async function checkAuth() {
-        const { data: { user } } = await supabase.auth.getUser()
-        
+    async function verificarAutenticacao() {
+        const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-            // Esconde menu de visitante, mostra menu logado
             document.getElementById('guest-menu').classList.add('d-none');
             document.getElementById('user-menu').classList.remove('d-none');
-            // Tenta pegar o nome do usuário (vamos configurar isso no cadastro)
-            document.getElementById('user-name-display').innerText = user.user_metadata?.nome || 'Anfitrião';
+            
+            const nomeElement = document.getElementById('user-name');
+            if (nomeElement) {
+                nomeElement.innerText = `Olá, ${user.user_metadata?.nome || user.email}`;
+            }
         }
-
-        // Configura o botão de logout
-        document.getElementById('btn-logout')?.addEventListener('click', async () => {
-            await supabase.auth.signOut();
-            window.location.reload(); // Recarrega a página após sair
-        });
     }
 
-    // 4. Função para buscar os imóveis no banco
-    async function loadImoveis() {
-        const container = document.getElementById('imoveis-container');
-        
-        // Faz o "SELECT * FROM imoveis ORDER BY id DESC"
+    document.getElementById('btn-sair')?.addEventListener('click', async () => {
+        await supabase.auth.signOut();
+        window.location.reload();
+    });
+
+    async function carregarImoveis() {
+        const container = document.getElementById('lista-imoveis');
+        if (!container) return;
+        container.innerHTML = '';
+
         const { data: imoveis, error } = await supabase
             .from('imoveis')
             .select('*')
             .order('id', { ascending: false });
 
-        // Remove o "Carregando..."
-        document.getElementById('loading-message').remove();
-
         if (error) {
-            container.innerHTML = `<div class="col-12 text-center text-danger"><p>Erro ao carregar: ${error.message}</p></div>`;
+            console.error(error);
             return;
         }
 
-        if (imoveis.length === 0) {
-            container.innerHTML = `<div class="col-12 text-center"><p class="text-muted">Nenhum imóvel cadastrado ainda.</p></div>`;
-            return;
-        }
-
-        // Loop para criar os cards (o antigo while($row = $result->fetch_assoc()))
         imoveis.forEach(imovel => {
-            // Nota sobre a Imagem: Como você usava uma pasta local "uploads/", 
-            // no futuro vamos apontar isso para o Supabase Storage. 
-            // Por enquanto, vou montar uma URL que aponta para um bucket chamado 'imoveis-imagens'.
-            const imageUrl = imovel.imagem 
-                ? `${supabaseUrl}/storage/v1/object/public/imoveis-imagens/${imovel.imagem}` 
-                : 'https://via.placeholder.com/400x220?text=Sem+Imagem';
-
+            const imageUrl = imovel.imagem ? `${supabaseUrl}/storage/v1/object/public/imoveis-imagens/${imovel.imagem}` : 'https://via.placeholder.com/400x220?text=Sem+Imagem';
             const precoFormatado = parseFloat(imovel.preco_diaria).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
             const cardHtml = `
@@ -143,10 +106,8 @@
         });
     }
 
-    // Inicia tudo quando a página carregar
-    checkAuth();
-    loadImoveis();
+    verificarAutenticacao();
+    carregarImoveis();
 </script>
-
 </body>
 </html>
