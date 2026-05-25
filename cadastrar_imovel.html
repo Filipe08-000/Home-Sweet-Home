@@ -41,9 +41,8 @@
                         <input type="number" id="preco" class="form-control" required>
                     </div>
                     <div class="mb-4">
-                        <label class="form-label fw-bold">Fotos do Imóvel (Selecione uma ou mais)</label>
+                        <label class="form-label fw-bold">Fotos do Imóvel</label>
                         <input type="file" id="foto" class="form-control" accept="image/*" multiple required>
-                        <small class="text-muted">Dica: Segure Ctrl (ou Cmd no Mac) para selecionar várias fotos de uma vez.</small>
                     </div>
 
                     <button type="submit" id="btn-cadastrar" class="btn btn-danger w-100 py-2 fs-5 fw-bold">Cadastrar Imóvel</button>
@@ -67,22 +66,24 @@
         const msgDiv = document.getElementById('msg-status');
         const files = document.getElementById('foto').files;
 
-        if (files.length === 0) {
-            msgDiv.innerHTML = `<div class="alert alert-danger">Por favor, selecione pelo menos uma foto.</div>`;
-            return;
-        }
+        if (files.length === 0) return;
 
         btn.disabled = true;
-        btn.innerText = "Enviando informações e fotos...";
+        btn.innerText = "Cadastrando...";
 
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error("Você precisa estar logado para anunciar.");
+            if (!user) throw new Error("Não autenticado");
 
-            // Usamos a primeira foto do array como a imagem de capa principal (para a index)
-            const primeiraFotoNome = `${Date.now()}_0_${files[0].name}`;
+            // Imagem principal para manter compatibilidade com o fluxo original
+            const primeiraFoto = files[0];
+            const nomeArquivo = `${Date.now()}_${primeiraFoto.name}`;
 
-            // 1. Inserir dados do imóvel na tabela principal
+            // Upload para o Bucket da imagem de capa principal
+            const { error: imgError } = await supabase.storage.from('imoveis-imagens').upload(nomeArquivo, primeiraFoto);
+            if (imgError) throw imgError;
+
+            // 1. Inserir dados do imóvel na tabela principal (Mantendo 'pendente')
             const { data: imovel, error: dbError } = await supabase
                 .from('imoveis')
                 .insert([{
@@ -90,33 +91,43 @@
                     cidade: document.getElementById('cidade').value,
                     descricao: document.getElementById('descricao').value,
                     preco_diaria: parseFloat(document.getElementById('preco').value),
-                    imagem: primeiraFotoNome, 
+                    imagem: nomeArquivo,
                     dono_id: user.id,
-                    status_processamento_imagem: 'processado'
+                    status_processamento_imagem: 'pendente'
                 }])
                 .select('id')
                 .single();
 
             if (dbError) throw dbError;
 
-            // 2. Loop para fazer upload de cada foto e vincular ao imóvel cadastrado
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                const nomeArquivo = `${Date.now()}_${i}_${file.name}`;
+            // Salva a primeira foto na tabela de múltiplas imagens
+            await supabase.from('imoveis_imagens').insert([{ imovel_id: imovel.id, caminho_imagem: nomeArquivo }]);
 
-                // Upload para o Bucket de imagens do Supabase
-                const { error: imgError } = await supabase.storage.from('imoveis-imagens').upload(nomeArquivo, file);
-                if (imgError) throw imgError;
-
-                // Salva a relação na nossa nova tabela auxiliar de imagens
-                const { error: relError } = await supabase.from('imoveis_imagens').insert([{
-                    imovel_id: imovel.id,
-                    caminho_imagem: nomeArquivo
-                }]);
-                if (relError) throw relError;
+            // Loop para processar fotos extras adicionadas (Múltiplas Fotos)
+            for (let i = 1; i < files.length; i++) {
+                const fotoExtra = files[i];
+                const nomeExtra = `${Date.now()}_${i}_${fotoExtra.name}`;
+                
+                const { error: uploadExtraErr } = await supabase.storage.from('imoveis-imagens').upload(nomeExtra, fotoExtra);
+                if (!uploadExtraErr) {
+                    await supabase.from('imoveis_imagens').insert([{
+                        imovel_id: imovel.id,
+                        caminho_imagem: nomeExtra
+                    }]);
+                }
             }
 
-            msgDiv.innerHTML = `<div class="alert alert-success">Imóvel cadastrado com sucesso com ${files.length} fotos!</div>`;
+            // 3. Enfileirar job de processamento da imagem (Mantendo o seu fluxo nativo de jobs)
+            const { error: jobError } = await supabase
+                .from('jobs_imagem')
+                .insert([{
+                    imovel_id: imovel.id,
+                    caminho_original: nomeArquivo
+                }]);
+
+            if (jobError) throw jobError;
+
+            msgDiv.innerHTML = `<div class="alert alert-success">Imóvel cadastrado com sucesso! Imagem enviada para processamento.</div>`;
             setTimeout(() => window.location.href = 'index.html', 2000);
 
         } catch (erro) {
