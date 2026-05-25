@@ -16,12 +16,12 @@
         
         <div class="d-flex align-items-center">
             <div id="guest-menu">
-                <a href="cadastrar_imovel.html" class="btn btn-outline-dark me-3 d-none d-md-inline-block">Anuncie seu espaço</a>
+                <a href="cadastrar_imovel.html" class="btn btn-success me-3 d-none d-md-inline-block">Anuncie seu espaço</a>
                 <a href="login.html" class="btn btn-dark">Entrar</a>
             </div>
 
             <div id="user-menu" class="d-none">
-                <span id="user-name" class="me-3 fw-bold text-secondary">Olá, ...!</span>
+                <a href="cadastrar_imovel.html" class="btn btn-success me-2">Anuncie seu espaço</a>
                 
                 <a href="inbox.html" class="btn btn-outline-primary me-2">
                     <i class="bi bi-chat-left-text-fill"></i> Mensagens
@@ -29,7 +29,10 @@
 
                 <a href="minhas_reservas.html" class="btn btn-outline-dark me-2 d-none d-md-inline-block">Hóspedes</a>
                 <a href="minhas_viagens.html" class="btn btn-outline-dark me-2">Minhas Viagens</a>
-                <a href="painel.html" class="btn btn-dark me-2">Painel Anfitrião</a>
+                
+                <a href="painel.html" class="btn btn-outline-dark me-2">Painel Anfitrião</a>
+
+                <span id="user-name" class="me-3 ms-2 fw-bold text-secondary">Olá, ...!</span>
                 <button id="btn-sair" class="btn btn-danger">Sair</button>
             </div>
         </div>
@@ -56,7 +59,8 @@
             
             const nomeElement = document.getElementById('user-name');
             if (nomeElement) {
-                nomeElement.innerText = `Olá, ${user.user_metadata?.nome || user.email}`;
+                // Exclamação adicionada ao final da string dinâmica de saudação
+                nomeElement.innerText = `Olá, ${user.user_metadata?.nome || user.email}!`;
             }
         }
     }
