@@ -7,7 +7,7 @@ Uma plataforma digital de intermediação de locação de imóveis focada em est
 ## 🚀 Arquitetura e Tecnologia
 O projeto evoluiu de um monólito local para uma arquitetura **Serverless (Sem Servidor)** em nuvem, garantindo alta disponibilidade e eliminando a necessidade de configurações locais complexas.
 
-* **Frontend:** HTML5, CSS3 (Bootstrap 5).
+* **Frontend:** HTML5, JavaScript.
 * **Backend as a Service (BaaS):** [Supabase](https://supabase.com/)
 * **Banco de Dados:** PostgreSQL (Hospedado na nuvem)
 * **Storage:** Supabase Storage (para imagens dos imóveis)
