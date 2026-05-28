@@ -109,7 +109,6 @@
     const supabaseUrl = 'https://drlnbbodugxkndtpomfa.supabase.co'
     const supabaseKey = 'sb_publishable_uxQbUyjsM-DgKapQzvE32Q_ZUNBtdp1'
     const supabase = createClient(supabaseUrl, supabaseKey)
-    //tira deppois essa parada aqui vvv
     window.supabase = supabase;
     
     const urlParams = new URLSearchParams(window.location.search);
@@ -122,8 +121,13 @@
         if (!imovelId) { window.location.href = 'index.html'; return; }
 
         const { data: { user } } = await supabase.auth.getUser();
+        let meuIdInterno = null;
+        
         if (user) {
             usuarioLogadoId = user.id;
+            // Busca o ID interno da tabela usuários para checagens
+            const { data: uDb } = await supabase.from('usuarios').select('id').eq('email', user.email).single();
+            if (uDb) meuIdInterno = uDb.id;
         }
 
         const { data: imovel, error } = await supabase.from('imoveis').select('*').eq('id', imovelId).single();
@@ -137,12 +141,32 @@
         document.getElementById('imovel-descricao').innerText = imovel.descricao;
         document.getElementById('imovel-preco').innerText = precoDiaria.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
+        let jaAlugou = false;
+
+        // Verifica se o usuário tem reserva neste imóvel
+        if (usuarioLogadoId) {
+            const idBusca = meuIdInterno || usuarioLogadoId;
+            const { data: reservasUser } = await supabase
+                .from('reservas')
+                .select('id')
+                .eq('imovel_id', imovelId)
+                .or(`usuario_id.eq.${usuarioLogadoId},usuario_id.eq.${idBusca}`);
+                
+            if (reservasUser && reservasUser.length > 0) {
+                jaAlugou = true;
+            }
+        }
+
         if (usuarioLogadoId && usuarioLogadoId !== imovel.dono_id) {
             document.getElementById('chat-btn-area').innerHTML = `
                 <a href="chat.html?imovel_id=${imovelId}&destinatario_id=${imovel.dono_id}" class="btn btn-outline-danger">
                     <i class="bi bi-chat-dots"></i> Falar com Anfitrião
                 </a>`;
-            document.getElementById('area-minha-avaliacao').classList.remove('d-none');
+                
+            // Exibe formulário de avaliação SOMENTE se tiver alugado
+            if (jaAlugou) {
+                document.getElementById('area-minha-avaliacao').classList.remove('d-none');
+            }
         }
 
         document.getElementById('loader').classList.add('d-none');
@@ -151,19 +175,74 @@
     }
 
     async function carregarAvaliacoes() {
-        const { data: avs } = await supabase.from('avaliacoes').select('*').eq('imovel_id', imovelId);
+        const { data: avs, error } = await supabase.from('avaliacoes').select('*').eq('imovel_id', imovelId);
         const lista = document.getElementById('lista-avaliacoes');
         lista.innerHTML = '';
+        
+        if (error) {
+            console.error(error);
+            return;
+        }
+
         if (avs && avs.length > 0) {
             let soma = 0;
             avs.forEach(av => {
-                soma += av.nota;
-                lista.innerHTML += `<div class="border-bottom py-2">⭐ ${av.nota} - ${av.comentario || ''}</div>`;
+                const notaNum = parseInt(av.nota);
+                soma += notaNum;
+                lista.innerHTML += `
+                    <div class="border-bottom py-3">
+                        <div class="fw-bold text-warning mb-1">⭐ ${notaNum} / 5</div>
+                        <div class="text-secondary">${av.comentario || 'Sem comentário'}</div>
+                    </div>`;
             });
-            document.getElementById('media-nota').innerText = (soma / avs.length).toFixed(1);
+            const media = (soma / avs.length).toFixed(1);
+            document.getElementById('media-nota').innerText = media;
             document.getElementById('total-avaliacoes').innerText = avs.length;
+        } else {
+            lista.innerHTML = '<div class="text-muted py-2">Nenhum hóspede avaliou este local ainda.</div>';
+            document.getElementById('media-nota').innerText = "0.0";
+            document.getElementById('total-avaliacoes').innerText = "0";
         }
     }
+
+    // ENVIO DE NOVA AVALIAÇÃO
+    document.getElementById('form-avaliacao').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!usuarioLogadoId) return;
+
+        const btn = document.getElementById('btn-enviar-av');
+        btn.disabled = true;
+        btn.innerText = "Enviando...";
+
+        const nota = parseInt(document.getElementById('nota').value);
+        const comentario = document.getElementById('comentario').value;
+
+        // Pega id interno para manter consistência nas tabelas se necessário
+        let idParaSalvar = usuarioLogadoId;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data: uDb } = await supabase.from('usuarios').select('id').eq('email', user.email).single();
+            if (uDb) idParaSalvar = uDb.id;
+        }
+
+        const { error } = await supabase.from('avaliacoes').insert([{
+            imovel_id: imovelId,
+            usuario_id: idParaSalvar,
+            nota: nota,
+            comentario: comentario
+        }]);
+
+        if (error) {
+            alert("Erro ao enviar avaliação: " + error.message);
+        } else {
+            alert("Sua avaliação foi salva! Muito obrigado.");
+            document.getElementById('comentario').value = '';
+            carregarAvaliacoes(); // Recalcula na hora
+        }
+        
+        btn.disabled = false;
+        btn.innerText = "Enviar Avaliação";
+    });
 
     function calc() {
         const d1 = $("#checkin").datepicker('getDate');
@@ -177,7 +256,6 @@
         return null;
     }
 
-    // Configuração do calendário atualizada para aceitar digitação
     $(function() {
         $("#checkin").datepicker({ 
             minDate: 0, 
