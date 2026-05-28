@@ -130,7 +130,6 @@
             if (uDb) meuIdInterno = uDb.id;
         }
 
-        // 1. Carrega os dados básicos do imóvel
         const { data: imovel, error } = await supabase.from('imoveis').select('*').eq('id', imovelId).single();
         if (error || !imovel) { alert("Imóvel não encontrado!"); return; }
 
@@ -142,7 +141,7 @@
         document.getElementById('imovel-descricao').innerText = imovel.descricao;
         document.getElementById('imovel-preco').innerText = precoDiaria.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
-        // 2. Mapeia e carrega datas indisponíveis (Bloqueio de concorrência)
+        // Mapeia datas ocupadas
         const { data: reservasExistentes } = await supabase
             .from('reservas')
             .select('data_inicio, data_fim')
@@ -153,7 +152,6 @@
             reservasExistentes.forEach(res => {
                 let dIn = new Date(res.data_inicio + 'T12:00:00');
                 let dFi = new Date(res.data_fim + 'T12:00:00');
-                // Adiciona todos os dias do intervalo ao bloqueio (deixa o dia do checkout livre para nova entrada)
                 while (dIn < dFi) {
                     let y = dIn.getFullYear();
                     let m = String(dIn.getMonth() + 1).padStart(2, '0');
@@ -162,12 +160,10 @@
                     dIn.setDate(dIn.getDate() + 1);
                 }
             });
-            // Atualiza os calendários com as novas datas travadas
             $("#checkin").datepicker("refresh");
             $("#checkout").datepicker("refresh");
         }
 
-        // 3. Verifica permissão de avaliação
         let jaAlugou = false;
         if (usuarioLogadoId) {
             const idBusca = meuIdInterno || usuarioLogadoId;
@@ -198,7 +194,6 @@
         carregarAvaliacoes();
     }
 
-    // CARREGAR AVALIAÇÕES COM NOME DO USUÁRIO
     async function carregarAvaliacoes() {
         const { data: avs, error } = await supabase.from('avaliacoes').select('*').eq('imovel_id', imovelId);
         const lista = document.getElementById('lista-avaliacoes');
@@ -208,12 +203,10 @@
 
         if (avs && avs.length > 0) {
             let soma = 0;
-            
             for (const av of avs) {
                 const notaNum = parseInt(av.nota);
                 soma += notaNum;
                 
-                // Busca de forma reativa o nome associado à avaliação na tabela pública de usuários
                 let nomeUsuario = 'Hóspede';
                 if (av.usuario_id) {
                     const { data: usr } = await supabase
@@ -243,7 +236,6 @@
         }
     }
 
-    // ENVIO DE NOVA AVALIAÇÃO
     document.getElementById('form-avaliacao').addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!usuarioLogadoId) return;
@@ -276,18 +268,15 @@
             document.getElementById('comentario').value = '';
             carregarAvaliacoes();
         }
-        
         btn.disabled = false;
         btn.innerText = "Enviar Avaliação";
     });
 
-    // FUNÇÃO QUE DETECTA E TRAVA DIAS JÁ RESERVADOS NO CALENDÁRIO
     function desabilitarDatas(date) {
         let y = date.getFullYear();
         let m = String(date.getMonth() + 1).padStart(2, '0');
         let d = String(date.getDate()).padStart(2, '0');
         let dataStr = `${y}-${m}-${d}`;
-        
         if (datasBloqueadas.includes(dataStr)) {
             return [false, "", "Indisponível"];
         }
@@ -306,7 +295,6 @@
         return null;
     }
 
-    // Inicialização segura do Datepicker com desativação dinâmica
     $(function() {
         $("#checkin").datepicker({ 
             minDate: 0, 
@@ -323,7 +311,6 @@
         }).on('change', function() { calc(); });
     });
 
-    // ENVIO DA RESERVA COM CHECAGEM ANTI-CONCORRÊNCIA EM TEMPO REAL
     document.getElementById('form-reserva').addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!usuarioLogadoId) { window.location.href = 'login.html'; return; }
@@ -338,7 +325,6 @@
         const checkinVal = $("#checkin").val();
         const checkoutVal = $("#checkout").val();
 
-        // Checagem de última hora contra concorrência dupla antes de injetar no banco
         const { data: conflitos } = await supabase
             .from('reservas')
             .select('data_inicio, data_fim')
@@ -359,7 +345,6 @@
             alert("Desculpe! Esse período acabou de ser reservado por outro usuário. Escolha novas datas.");
             btn.disabled = false;
             btn.innerText = "Reservar agora";
-            // Força recarregamento da página para atualizar o calendário
             window.location.reload();
             return;
         }
