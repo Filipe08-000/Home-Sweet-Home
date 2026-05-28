@@ -109,7 +109,9 @@
     const supabaseUrl = 'https://drlnbbodugxkndtpomfa.supabase.co'
     const supabaseKey = 'sb_publishable_uxQbUyjsM-DgKapQzvE32Q_ZUNBtdp1'
     const supabase = createClient(supabaseUrl, supabaseKey)
-
+    //tira deppois essa parada aqui vvv
+    window.supabase = supabase;
+    
     const urlParams = new URLSearchParams(window.location.search);
     const imovelId = urlParams.get('id');
 
