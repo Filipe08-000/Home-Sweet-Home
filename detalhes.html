@@ -83,11 +83,11 @@
                 <form id="form-reserva">
                     <div class="mb-3">
                         <label class="small fw-bold text-uppercase text-muted">Check-in</label>
-                        <input type="text" id="checkin" class="form-control" placeholder="AAAA-MM-DD" required>
+                        <input type="text" id="checkin" class="form-control" placeholder="AAAA-MM-DD" required autocomplete="off">
                     </div>
                     <div class="mb-3">
                         <label class="small fw-bold text-uppercase text-muted">Check-out</label>
-                        <input type="text" id="checkout" class="form-control" placeholder="AAAA-MM-DD" required>
+                        <input type="text" id="checkout" class="form-control" placeholder="AAAA-MM-DD" required autocomplete="off">
                     </div>
                     <div class="d-flex justify-content-between mt-4 p-2 bg-light rounded">
                         <span class="fw-bold">Total estimado:</span>
@@ -116,6 +116,7 @@
 
     let precoDiaria = 0;
     let usuarioLogadoId = null;
+    let datasBloqueadas = [];
 
     async function init() {
         if (!imovelId) { window.location.href = 'index.html'; return; }
@@ -125,11 +126,11 @@
         
         if (user) {
             usuarioLogadoId = user.id;
-            // Busca o ID interno da tabela usuários para checagens
             const { data: uDb } = await supabase.from('usuarios').select('id').eq('email', user.email).single();
             if (uDb) meuIdInterno = uDb.id;
         }
 
+        // 1. Carrega os dados básicos do imóvel
         const { data: imovel, error } = await supabase.from('imoveis').select('*').eq('id', imovelId).single();
         if (error || !imovel) { alert("Imóvel não encontrado!"); return; }
 
@@ -141,9 +142,33 @@
         document.getElementById('imovel-descricao').innerText = imovel.descricao;
         document.getElementById('imovel-preco').innerText = precoDiaria.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
-        let jaAlugou = false;
+        // 2. Mapeia e carrega datas indisponíveis (Bloqueio de concorrência)
+        const { data: reservasExistentes } = await supabase
+            .from('reservas')
+            .select('data_inicio, data_fim')
+            .eq('imovel_id', imovelId)
+            .neq('status', 'Cancelada');
 
-        // Verifica se o usuário tem reserva neste imóvel
+        if (reservasExistentes) {
+            reservasExistentes.forEach(res => {
+                let dIn = new Date(res.data_inicio + 'T12:00:00');
+                let dFi = new Date(res.data_fim + 'T12:00:00');
+                // Adiciona todos os dias do intervalo ao bloqueio (deixa o dia do checkout livre para nova entrada)
+                while (dIn < dFi) {
+                    let y = dIn.getFullYear();
+                    let m = String(dIn.getMonth() + 1).padStart(2, '0');
+                    let d = String(dIn.getDate()).padStart(2, '0');
+                    datasBloqueadas.push(`${y}-${m}-${d}`);
+                    dIn.setDate(dIn.getDate() + 1);
+                }
+            });
+            // Atualiza os calendários com as novas datas travadas
+            $("#checkin").datepicker("refresh");
+            $("#checkout").datepicker("refresh");
+        }
+
+        // 3. Verifica permissão de avaliação
+        let jaAlugou = false;
         if (usuarioLogadoId) {
             const idBusca = meuIdInterno || usuarioLogadoId;
             const { data: reservasUser } = await supabase
@@ -163,7 +188,6 @@
                     <i class="bi bi-chat-dots"></i> Falar com Anfitrião
                 </a>`;
                 
-            // Exibe formulário de avaliação SOMENTE se tiver alugado
             if (jaAlugou) {
                 document.getElementById('area-minha-avaliacao').classList.remove('d-none');
             }
@@ -174,27 +198,41 @@
         carregarAvaliacoes();
     }
 
+    // CARREGAR AVALIAÇÕES COM NOME DO USUÁRIO
     async function carregarAvaliacoes() {
         const { data: avs, error } = await supabase.from('avaliacoes').select('*').eq('imovel_id', imovelId);
         const lista = document.getElementById('lista-avaliacoes');
         lista.innerHTML = '';
         
-        if (error) {
-            console.error(error);
-            return;
-        }
+        if (error) { console.error(error); return; }
 
         if (avs && avs.length > 0) {
             let soma = 0;
-            avs.forEach(av => {
+            
+            for (const av of avs) {
                 const notaNum = parseInt(av.nota);
                 soma += notaNum;
+                
+                // Busca de forma reativa o nome associado à avaliação na tabela pública de usuários
+                let nomeUsuario = 'Hóspede';
+                if (av.usuario_id) {
+                    const { data: usr } = await supabase
+                        .from('usuarios')
+                        .select('nome')
+                        .eq('id', av.usuario_id)
+                        .maybeSingle();
+                    if (usr && usr.nome) nomeUsuario = usr.nome;
+                }
+
                 lista.innerHTML += `
                     <div class="border-bottom py-3">
-                        <div class="fw-bold text-warning mb-1">⭐ ${notaNum} / 5</div>
-                        <div class="text-secondary">${av.comentario || 'Sem comentário'}</div>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <div class="fw-bold text-warning">⭐ ${notaNum} / 5</div>
+                            <small class="text-muted fw-bold"><i class="bi bi-person-fill"></i> ${nomeUsuario}</small>
+                        </div>
+                        <div class="text-secondary" style="white-space: pre-wrap;">${av.comentario || 'Sem comentário'}</div>
                     </div>`;
-            });
+            }
             const media = (soma / avs.length).toFixed(1);
             document.getElementById('media-nota').innerText = media;
             document.getElementById('total-avaliacoes').innerText = avs.length;
@@ -217,7 +255,6 @@
         const nota = parseInt(document.getElementById('nota').value);
         const comentario = document.getElementById('comentario').value;
 
-        // Pega id interno para manter consistência nas tabelas se necessário
         let idParaSalvar = usuarioLogadoId;
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
@@ -237,18 +274,31 @@
         } else {
             alert("Sua avaliação foi salva! Muito obrigado.");
             document.getElementById('comentario').value = '';
-            carregarAvaliacoes(); // Recalcula na hora
+            carregarAvaliacoes();
         }
         
         btn.disabled = false;
         btn.innerText = "Enviar Avaliação";
     });
 
+    // FUNÇÃO QUE DETECTA E TRAVA DIAS JÁ RESERVADOS NO CALENDÁRIO
+    function desabilitarDatas(date) {
+        let y = date.getFullYear();
+        let m = String(date.getMonth() + 1).padStart(2, '0');
+        let d = String(date.getDate()).padStart(2, '0');
+        let dataStr = `${y}-${m}-${d}`;
+        
+        if (datasBloqueadas.includes(dataStr)) {
+            return [false, "", "Indisponível"];
+        }
+        return [true, "", ""];
+    }
+
     function calc() {
         const d1 = $("#checkin").datepicker('getDate');
         const d2 = $("#checkout").datepicker('getDate');
         if (d1 && d2 && d2 > d1) {
-            const dias = Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
+            const dias = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
             const total = dias * precoDiaria;
             $("#total-display").text("R$ " + total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }));
             return { dias, total };
@@ -256,20 +306,24 @@
         return null;
     }
 
+    // Inicialização segura do Datepicker com desativação dinâmica
     $(function() {
         $("#checkin").datepicker({ 
             minDate: 0, 
             dateFormat: 'yy-mm-dd', 
+            beforeShowDay: desabilitarDatas,
             onSelect: function() { calc(); } 
         }).on('change', function() { calc(); });
 
         $("#checkout").datepicker({ 
             minDate: 1, 
             dateFormat: 'yy-mm-dd', 
+            beforeShowDay: desabilitarDatas,
             onSelect: function() { calc(); } 
         }).on('change', function() { calc(); });
     });
 
+    // ENVIO DA RESERVA COM CHECAGEM ANTI-CONCORRÊNCIA EM TEMPO REAL
     document.getElementById('form-reserva').addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!usuarioLogadoId) { window.location.href = 'login.html'; return; }
@@ -279,12 +333,42 @@
 
         const btn = document.getElementById('btn-reservar');
         btn.disabled = true;
+        btn.innerText = "Processando...";
+
+        const checkinVal = $("#checkin").val();
+        const checkoutVal = $("#checkout").val();
+
+        // Checagem de última hora contra concorrência dupla antes de injetar no banco
+        const { data: conflitos } = await supabase
+            .from('reservas')
+            .select('data_inicio, data_fim')
+            .eq('imovel_id', imovelId)
+            .neq('status', 'Cancelada');
+
+        let dataOcupadaDeUltimaHora = false;
+        if (conflitos) {
+            for (let r of conflitos) {
+                if (checkinVal < r.data_fim && checkoutVal > r.data_inicio) {
+                    dataOcupadaDeUltimaHora = true;
+                    break;
+                }
+            }
+        }
+
+        if (dataOcupadaDeUltimaHora) {
+            alert("Desculpe! Esse período acabou de ser reservado por outro usuário. Escolha novas datas.");
+            btn.disabled = false;
+            btn.innerText = "Reservar agora";
+            // Força recarregamento da página para atualizar o calendário
+            window.location.reload();
+            return;
+        }
 
         const { error } = await supabase.from('reservas').insert([{
             imovel_id: imovelId,
             usuario_id: usuarioLogadoId,
-            data_inicio: $("#checkin").val(),
-            data_fim: $("#checkout").val(),
+            data_inicio: checkinVal,
+            data_fim: checkoutVal,
             dias: res.dias,
             valor_total: res.total,
             status: 'Confirmada',
@@ -294,8 +378,9 @@
         if (error) { 
             alert("Erro: " + error.message); 
             btn.disabled = false; 
+            btn.innerText = "Reservar agora";
         } else { 
-            alert("Reserva feita!");
+            alert("Reserva feita com sucesso!");
             window.location.href = 'minhas_viagens.html'; 
         }
     });
